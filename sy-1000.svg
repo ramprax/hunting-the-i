@@ -1,0 +1,51 @@
+<svg id="Layer_1" data-name="Layer 1" xmlns="http://www.w3.org/2000/svg"
+    width="2010" height="2010" font-family="Times New Roman"
+	xmlns:xlink="http://www.w3.org/1999/xlink"
+>
+    <!-- viewBox="0 0 1000 1000" -->
+    <defs>
+        
+        <circle id="outerCircle" cx="1000" cy="1000" r="1000" fill="blue"/>
+		<polygon id="upTriangleOne" points="1000.0,0.0 34.07417399999997,1258.819045 1965.9258260000001,1258.819045" fill="blue"/>
+		<polygon id="upTriangleTwo" points="1000.0,2000.0 34.07417399999997,741.180955 1965.9258260000001,741.180955" fill="blue"/>
+		<polygon id="upTriangleThree" points="1000.0,741.180955 507.46697447583585,1707.106781 1492.5330255241643,1707.106781" fill="blue"/>
+		<polygon id="upTriangleFour" points="1000.0,292.89321900000004 290.7714987718722,1497.444332435953 1709.2285012281277,1497.444332435953" fill="blue"/>
+		<polygon id="downTriangleOne" points="1000,1120.1183368263437 423.79892115248697,292.89321900000004 1576.2010788475131,292.89321900000004" fill="blue"/>
+		<polygon id="downTriangleTwo" points="1000.0,1707.106781 308.68483832726554,532.9796184761167 1691.3151616727346,532.9796184761167" fill="blue"/>
+		<polygon id="downTriangleThree" points="1000,532.9796184761166 654.3866591829369,1120.1183368263437 1345.613340817063,1120.1183368263437" fill="blue"/>
+		<polygon id="downTriangleFour" points="1000,1497.444332435953 671.2755388672529,851.1976511899289 1328.7244611327471,851.1976511899289" fill="blue"/>
+		<polygon id="downTriangleFive" points="1000.0,1258.819045 748.6619377707528,959.9605544001738 1251.338062229247,959.9605544001738" fill="blue"/>
+		<filter id="imageXor">
+		  <feImage xlink:href="#outerCircle" result="inputOC" x="0" y="0" width="2000" height="2000"/>
+		  <feImage xlink:href="#upTriangleOne" result="inputU1" x="0" y="0" width="2000" height="2000"/>
+		  <feImage xlink:href="#upTriangleTwo" result="inputU2" x="0" y="0" width="2000" height="2000"/>
+		  <feImage xlink:href="#upTriangleThree" result="inputU3" x="0" y="0" width="2000" height="2000"/>
+		  <feImage xlink:href="#upTriangleFour" result="inputU4" x="0" y="0" width="2000" height="2000"/>
+		  <feImage xlink:href="#downTriangleOne" result="inputD1" x="0" y="0" width="2000" height="2000"/>
+		  <feImage xlink:href="#downTriangleTwo" result="inputD2" x="0" y="0" width="2000" height="2000"/>
+		  <feImage xlink:href="#downTriangleThree" result="inputD3" x="0" y="0" width="2000" height="2000"/>
+		  <feImage xlink:href="#downTriangleFour" result="inputD4" x="0" y="0" width="2000" height="2000"/>
+		  <feImage xlink:href="#downTriangleFive" result="inputD5" x="0" y="0" width="2000" height="2000"/>
+		  <feComposite in="SourceGraphic" in2="inputU1" operator="xor" result="resultU1"/>
+		  <feComposite in="resultU1" in2="inputU2" operator="xor" result="resultU2"/>
+		  <feComposite in="resultU2" in2="inputU3" operator="xor" result="resultU3"/>
+		  <feComposite in="resultU3" in2="inputU4" operator="xor" result="resultU4"/>
+		  <feComposite in="resultU4" in2="inputD1" operator="xor" result="resultD1"/>
+		  <feComposite in="resultD1" in2="inputD2" operator="xor" result="resultD2"/>
+		  <feComposite in="resultD2" in2="inputD3" operator="xor" result="resultD3"/>
+		  <feComposite in="resultD3" in2="inputD4" operator="xor" result="resultD4"/>
+		  <feComposite in="resultD4" in2="inputD5" operator="xor" result="resultD5"/>
+		  <feComposite in="resultD5" in2="inputOC" operator="xor"/>
+		  
+		</filter>
+    </defs>
+    <g >
+        <!--    - The visual output of the XOR operation will appear here.
+             You might need a placeholder shape or simply let the filter define the output. -->
+			 <rect x="0" y="0" width="2010px" height="2010px" fill="white" />
+	 <g transform="translate(5, 5)">
+		 <rect x="0" y="0" width="2000px" height="2000px" fill="blue" filter="url(#imageXor)"/>
+	 </g>
+    </g>
+
+</svg>
