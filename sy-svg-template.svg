@@ -1,0 +1,51 @@
+<svg id="Layer_1" data-name="Layer 1" xmlns="http://www.w3.org/2000/svg"
+    width="{outer_width}" height="{outer_height}" font-family="Times New Roman"
+	xmlns:xlink="http://www.w3.org/1999/xlink"
+>
+    <!-- viewBox="0 0 1000 1000" -->
+    <defs>
+        
+        <circle id="outerCircle" cx="{circle_centre_x}" cy="{circle_centre_y}" r="{circle_radius}" fill="blue"/>
+		<polygon id="upTriangleOne" points="{t1_points}" fill="blue"/>
+		<polygon id="upTriangleTwo" points="{t2_points}" fill="blue"/>
+		<polygon id="upTriangleThree" points="{t3_points}" fill="blue"/>
+		<polygon id="upTriangleFour" points="{t4_points}" fill="blue"/>
+		<polygon id="downTriangleOne" points="{t5_points}" fill="blue"/>
+		<polygon id="downTriangleTwo" points="{t6_points}" fill="blue"/>
+		<polygon id="downTriangleThree" points="{t7_points}" fill="blue"/>
+		<polygon id="downTriangleFour" points="{t8_points}" fill="blue"/>
+		<polygon id="downTriangleFive" points="{t9_points}" fill="blue"/>
+		<filter id="imageXor">
+		  <feImage xlink:href="#outerCircle" result="inputOC" x="0" y="0" width="{inner_width}" height="{inner_height}"/>
+		  <feImage xlink:href="#upTriangleOne" result="inputU1" x="0" y="0" width="{inner_width}" height="{inner_height}"/>
+		  <feImage xlink:href="#upTriangleTwo" result="inputU2" x="0" y="0" width="{inner_width}" height="{inner_height}"/>
+		  <feImage xlink:href="#upTriangleThree" result="inputU3" x="0" y="0" width="{inner_width}" height="{inner_height}"/>
+		  <feImage xlink:href="#upTriangleFour" result="inputU4" x="0" y="0" width="{inner_width}" height="{inner_height}"/>
+		  <feImage xlink:href="#downTriangleOne" result="inputD1" x="0" y="0" width="{inner_width}" height="{inner_height}"/>
+		  <feImage xlink:href="#downTriangleTwo" result="inputD2" x="0" y="0" width="{inner_width}" height="{inner_height}"/>
+		  <feImage xlink:href="#downTriangleThree" result="inputD3" x="0" y="0" width="{inner_width}" height="{inner_height}"/>
+		  <feImage xlink:href="#downTriangleFour" result="inputD4" x="0" y="0" width="{inner_width}" height="{inner_height}"/>
+		  <feImage xlink:href="#downTriangleFive" result="inputD5" x="0" y="0" width="{inner_width}" height="{inner_height}"/>
+		  <feComposite in="SourceGraphic" in2="inputU1" operator="xor" result="resultU1"/>
+		  <feComposite in="resultU1" in2="inputU2" operator="xor" result="resultU2"/>
+		  <feComposite in="resultU2" in2="inputU3" operator="xor" result="resultU3"/>
+		  <feComposite in="resultU3" in2="inputU4" operator="xor" result="resultU4"/>
+		  <feComposite in="resultU4" in2="inputD1" operator="xor" result="resultD1"/>
+		  <feComposite in="resultD1" in2="inputD2" operator="xor" result="resultD2"/>
+		  <feComposite in="resultD2" in2="inputD3" operator="xor" result="resultD3"/>
+		  <feComposite in="resultD3" in2="inputD4" operator="xor" result="resultD4"/>
+		  <feComposite in="resultD4" in2="inputD5" operator="xor" result="resultD5"/>
+		  <feComposite in="resultD5" in2="inputOC" operator="xor"/>
+		  
+		</filter>
+    </defs>
+    <g >
+        <!--    - The visual output of the XOR operation will appear here.
+             You might need a placeholder shape or simply let the filter define the output. -->
+			 <rect x="0" y="0" width="{outer_width}px" height="{outer_height}px" fill="white" />
+	 <g transform="translate({out_in_padding}, {out_in_padding})">
+		 <rect x="0" y="0" width="{inner_width}px" height="{inner_height}px" fill="blue" filter="url(#imageXor)"/>
+	 </g>
+    </g>
+
+</svg>
