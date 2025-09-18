@@ -7,7 +7,7 @@
 [<img src="avhtisise.svg">](https://github.com/ramprax/hunting-the-i/blob/main/avhtisise.svg)
 
 ## Shree Yantra - PNG
-[](https://github.com/ramprax/hunting-the-i/blob/main/sy.png)
+[<img src="sy.png">](https://github.com/ramprax/hunting-the-i/blob/main/sy.png)
 
 ## Shree Yantra - SVG
 [<img src="sy-1000.svg">](https://github.com/ramprax/hunting-the-i/blob/main/sy-1000.svg)
