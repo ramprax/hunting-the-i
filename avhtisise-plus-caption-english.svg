@@ -4,6 +4,11 @@
     <!-- viewBox="0 0 1000 1000" -->
     <defs>
         <style>.cls-1{fill:#f4795b;}</style>
+		<g id="arrow">
+			<line x1="220" y1="220" x2="390" y2="390" stroke="black"  stroke-width="10" />
+			<polyline points="400,400,330,370,370,330" />
+        </g>
+
     </defs>
 <!--    <circle class="cls-1" cx="500" cy="500" r="500" />-->
 <!--    <svg height="100" width="100">-->
@@ -31,24 +36,32 @@
         <text x="500" y="500" fill="black" font-size="200" font-weight="bold"
               dominant-baseline="central" text-anchor="middle">I</text>
 
+        <text x="853" y="146" fill="black" font-size="100" font-weight="bold"
+                dominant-baseline="middle" text-anchor="middle">?</text> <!-- ? OK -->
+        <text x="146" y="146" fill="black" font-size="100" font-weight="bold"
+                dominant-baseline="middle" text-anchor="middle">?</text> <!-- ? OK -->
+        <text x="146" y="853" fill="black" font-size="100" font-weight="bold"
+                dominant-baseline="middle" text-anchor="middle">?</text> <!-- ? OK -->
+        <text x="853" y="853" fill="black" font-size="100" font-weight="bold"
+                dominant-baseline="middle" text-anchor="middle">?</text> <!-- ? OK -->
+
         <g transform="rotate(45.0 500 500)">
 <!--            <text x="510" y="70" fill="black" font-size="100" font-weight="bold" rotate="-45">?</text>-->
 <!--            <text x="510" y="1015" fill="black" font-size="100" font-weight="bold" rotate="-45">?</text>-->
 <!--            <text x="35" y="540" fill="black" font-size="100" font-weight="bold" rotate="-45">?</text>-->
 <!--            <text x="984" y="540" fill="black" font-size="100" font-weight="bold" rotate="-45">?</text>-->
-            <text x="500" y="0" fill="black" font-size="100" font-weight="bold"
-                  dominant-baseline="mathematical" text-anchor="middle" rotate="-45">?</text> <!-- ? OK -->
-            <text x="500" y="1000" fill="black" font-size="100" font-weight="bold"
-                  dominant-baseline="mathematical" text-anchor="middle" rotate="-45">?</text> <!-- ?? -->
-            <text x="0" y="500" fill="black" font-size="100" font-weight="bold"
-                  dominant-baseline="mathematical" text-anchor="middle" rotate="-45">?</text> <!-- ??? OK -->
-            <text x="1000" y="500" fill="black" font-size="100" font-weight="bold"
-                  dominant-baseline="mathematical" text-anchor="middle" rotate="-45">?</text>  <!-- ???? -->
+            <!-- <text x="500" y="0" fill="black" font-size="100" font-weight="bold"
+                  dominant-baseline="mathematical" text-anchor="middle" rotate="-45">?</text> ? OK -->
+            <!-- <text x="500" y="1000" fill="black" font-size="100" font-weight="bold"
+                  dominant-baseline="mathematical" text-anchor="middle" rotate="-45">?</text> ?? -->
+            <!-- <text x="0" y="500" fill="black" font-size="100" font-weight="bold"
+                  dominant-baseline="mathematical" text-anchor="middle" rotate="-45">?</text> ??? OK -->
+            <!-- <text x="1000" y="500" fill="black" font-size="100" font-weight="bold"
+                  dominant-baseline="mathematical" text-anchor="middle" rotate="-45">?</text>  ???? -->
         </g>
 
-        <g id="arrow">
-            <line x1="220" y1="220" x2="390" y2="390" stroke="black"  stroke-width="10" />
-            <polyline points="400,400,330,370,370,330" />
+        <g>
+			<use href="#arrow" />
         </g>
         <g transform="rotate(45 500 500)">
             <use href="#arrow" />
