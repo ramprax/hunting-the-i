@@ -371,28 +371,46 @@ def to_image_coords(point, tx=0, ty=0):
     x, y = point
     return x + tx, ty - y
 
+
+def generate_sy_png_outline(radius, sy_triangles):
+    img = Image.new('RGB', (2*radius+1, 2*radius+1), color = 'white')
+    draw = ImageDraw.Draw(img)
+    draw.circle(xy = (radius, radius), radius=radius,
+                fill = None,
+                outline = (0, 0, 0),
+                width = 1)
+    for tri in [[to_image_coords(syt_pt, radius, radius) for syt_pt in syt] for syt in sy_triangles]:
+        draw.polygon(tri, fill = None, outline = (0, 0, 0))
+    
+    img.save(f'sy-{radius}.png')
+    
+
 def generate_sy_png_gif(radius, sy_triangles):
     blank_image = Image.new('RGB', (2*radius+1, 2*radius+1), color = 'black')
     circle_image = make_sy_outer_circle_image(radius)
-    triangle_images = [make_sy_triangle_image([to_image_coords(syt_pt, radius, radius) for syt_pt in syt], radius) for syt in sy_triangles]
+    triangle_images = [
+        make_sy_triangle_image(
+                    [to_image_coords(syt_pt, radius, radius) for syt_pt in syt], radius
+                    ) for syt in sy_triangles]
 
-    xor_image_list = [blank_image, circle_image] + triangle_images
-    xor_image_list_converted = [ximg.convert("1") for ximg in xor_image_list]
+    sub_image_list = [blank_image, circle_image] + triangle_images
+    sub_image_list_converted = [ximg.convert("1") for ximg in sub_image_list]
 
-    xor_result_image = None
-    gif_frames = xor_image_list_converted[:]
+    combined_image = None
+    gif_frames = sub_image_list_converted[:]
     # xor_image.show()
-    for image_to_xor in xor_image_list_converted:
-        xor_result_image = ImageChops.logical_xor(xor_result_image, image_to_xor) if xor_result_image else image_to_xor
+    combine_func = ImageChops.logical_xor
+    for image_to_xor in sub_image_list_converted:
+        combined_image = combine_func(combined_image, image_to_xor) if combined_image else image_to_xor
         # xor_image.show()
-        gif_frames.append(xor_result_image)
+        gif_frames.append(combined_image)
 
     # xor_result_image.show()
-    gif_frames.append(xor_result_image)
+    gif_frames.append(combined_image)
 
-    xor_result_image.save(f'sy-{radius}.png')
+    combined_image.save(f'sy-{radius}-filled.png')
 
-    gif_frames[0].save(f'sy-{radius}.gif', save_all = True, append_images = gif_frames[1:],
+    gif_frames[0].save(f'sy-{radius}-filled.gif', save_all = True, append_images = gif_frames[1:],
                         optimize = False, duration = 1000, loop=0)
 
 
@@ -420,8 +438,9 @@ def generate_sy_svg(radius, sy_triangles):
 
 
 def main():
-    radius = 300
+    radius = 1000
     sy_triangles = build_sy_triangles(radius, show_turtle=False, show_turtle_intermediate_steps=True)
+    generate_sy_png_outline(radius, sy_triangles)
     generate_sy_png_gif(radius, sy_triangles)
     generate_sy_svg(radius, sy_triangles)
 
