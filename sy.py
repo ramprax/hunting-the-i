@@ -2,7 +2,6 @@ from turtle import *
 import math
 import pathlib
 
-import PIL
 from PIL import Image, ImageDraw, ImageChops
 
 # Mathematical co-ord system:
@@ -325,6 +324,8 @@ def build_sy_triangles(radius, show_turtle=False, show_turtle_intermediate_steps
     print('Down triangle-4:', down_triangle4)
     if show_turtle_intermediate_steps:
         draw_polygon(down_triangle4)
+        draw_circle(origin_point, radius/100)
+
 
     if t:
         if show_turtle_intermediate_steps:
@@ -341,6 +342,7 @@ def build_sy_triangles(radius, show_turtle=False, show_turtle_intermediate_steps
         draw_polygon(up_triangle3)
         draw_polygon(down_triangle3)
         draw_polygon(down_triangle4)
+        draw_circle(origin_point, radius/100)
 
         t.teleport(0, 0)
 
@@ -360,6 +362,20 @@ def make_sy_outer_circle_image(outer_circle_radius):
                 outline = (255, 255, 255),
                 width = 1)
     return img
+
+def make_sy_centre_circle_image(outer_circle_radius):
+    img = Image.new('RGB', (2*outer_circle_radius+1, 2*outer_circle_radius+1), color = 'black')
+
+    draw = ImageDraw.Draw(img)
+
+    # Drawing a green circle on the image
+    centre_circle_radius = outer_circle_radius/100
+    draw.circle(xy = (outer_circle_radius, outer_circle_radius), radius=centre_circle_radius,
+                fill = (255, 255, 255),
+                outline = (255, 255, 255),
+                width = 1)
+    return img
+
 
 def make_sy_triangle_image(sy_triangle, outer_circle_radius):
     t_img = Image.new('RGB', (2*outer_circle_radius+1, 2*outer_circle_radius+1), color = 'black')
@@ -381,6 +397,10 @@ def generate_sy_png_outline(radius, sy_triangles):
                 width = 1)
     for tri in [[to_image_coords(syt_pt, radius, radius) for syt_pt in syt] for syt in sy_triangles]:
         draw.polygon(tri, fill = None, outline = (0, 0, 0))
+    draw.circle(xy = (radius, radius), radius=radius/100,
+                fill = None,
+                outline = (0, 0, 0),
+                width = 1)
     
     img.save(f'sy-{radius}.png')
     
@@ -392,8 +412,9 @@ def generate_sy_png_gif(radius, sy_triangles):
         make_sy_triangle_image(
                     [to_image_coords(syt_pt, radius, radius) for syt_pt in syt], radius
                     ) for syt in sy_triangles]
+    centre_circle_image = make_sy_centre_circle_image(radius)
 
-    sub_image_list = [blank_image, circle_image] + triangle_images
+    sub_image_list = [blank_image, circle_image] + triangle_images + [centre_circle_image]
     sub_image_list_converted = [ximg.convert("1") for ximg in sub_image_list]
 
     combined_image = None
@@ -424,6 +445,7 @@ def generate_sy_svg(radius, sy_triangles):
         'circle_centre_x': radius,
         'circle_centre_y': radius,
         'circle_radius': radius,
+        'centre_circle_radius': math.ceil(radius/100),
     }
 
     image_triangles = [[to_image_coords(syt_pt, radius, radius) for syt_pt in syt] for syt in sy_triangles]
@@ -438,7 +460,7 @@ def generate_sy_svg(radius, sy_triangles):
 
 
 def main():
-    radius = 1000
+    radius = 384
     sy_triangles = build_sy_triangles(radius, show_turtle=False, show_turtle_intermediate_steps=True)
     generate_sy_png_outline(radius, sy_triangles)
     generate_sy_png_gif(radius, sy_triangles)

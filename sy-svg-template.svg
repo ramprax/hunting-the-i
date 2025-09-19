@@ -15,6 +15,7 @@
 		<polygon id="downTriangleThree" points="{t7_points}" fill="blue"/>
 		<polygon id="downTriangleFour" points="{t8_points}" fill="blue"/>
 		<polygon id="downTriangleFive" points="{t9_points}" fill="blue"/>
+		<circle id="centreCircle" cx="{circle_centre_x}" cy="{circle_centre_y}" r="{centre_circle_radius}" fill="blue"/>
 		<filter id="imageXor">
 		  <feImage xlink:href="#outerCircle" result="inputOC" x="0" y="0" width="{inner_width}" height="{inner_height}"/>
 		  <feImage xlink:href="#upTriangleOne" result="inputU1" x="0" y="0" width="{inner_width}" height="{inner_height}"/>
@@ -26,6 +27,7 @@
 		  <feImage xlink:href="#downTriangleThree" result="inputD3" x="0" y="0" width="{inner_width}" height="{inner_height}"/>
 		  <feImage xlink:href="#downTriangleFour" result="inputD4" x="0" y="0" width="{inner_width}" height="{inner_height}"/>
 		  <feImage xlink:href="#downTriangleFive" result="inputD5" x="0" y="0" width="{inner_width}" height="{inner_height}"/>
+		  <feImage xlink:href="#centreCircle" result="inputCC" x="0" y="0" width="{inner_width}" height="{inner_height}"/>
 		  <feComposite in="SourceGraphic" in2="inputU1" operator="xor" result="resultU1"/>
 		  <feComposite in="resultU1" in2="inputU2" operator="xor" result="resultU2"/>
 		  <feComposite in="resultU2" in2="inputU3" operator="xor" result="resultU3"/>
@@ -35,7 +37,8 @@
 		  <feComposite in="resultD2" in2="inputD3" operator="xor" result="resultD3"/>
 		  <feComposite in="resultD3" in2="inputD4" operator="xor" result="resultD4"/>
 		  <feComposite in="resultD4" in2="inputD5" operator="xor" result="resultD5"/>
-		  <feComposite in="resultD5" in2="inputOC" operator="xor"/>
+		  <feComposite in="resultD5" in2="inputOC" operator="xor" result="resultOC"/>
+		  <feComposite in="resultOC" in2="inputCC" operator="xor"/>
 		  
 		</filter>
     </defs>
