@@ -46,7 +46,8 @@ def intersection_point(line1, line2):
     return x, y
 
 
-def build_sy_triangles(radius, show_turtle=False, show_turtle_intermediate_steps=False):
+def build_sy_triangles(outer_dalam_radius, show_turtle=False, show_turtle_intermediate_steps=False):
+    radius = int(outer_dalam_radius*.75)
     t = Turtle() if show_turtle else None
 
     #_ = input('Hit <Enter> to start')
@@ -77,6 +78,27 @@ def build_sy_triangles(radius, show_turtle=False, show_turtle_intermediate_steps
             t.goto(x, y)
         t.goto(ox, oy)
 
+    def make_bezier_curve(points):
+        bezier_points = []
+        for _ti in range(101):
+            _t = _ti/100
+            weighted_points = points[:]
+            while len(weighted_points) > 1:
+                new_weighted_points = []
+                for i, pt in enumerate(weighted_points):
+                    if (i+1) < len(weighted_points):
+                        x0, y0 = pt
+                        x1, y1 = weighted_points[i+1]
+                        nx = x1*_t + x0*(1-_t)
+                        ny = y1*_t + y0*(1-_t)
+                        new_weighted_points.append((nx, ny))
+                weighted_points = new_weighted_points
+            if weighted_points:
+                x, y = weighted_points[0]
+                bezier_points.append((x, y))
+
+        return bezier_points
+
     origin_point = (0, 0)
 
     if t:
@@ -89,6 +111,90 @@ def build_sy_triangles(radius, show_turtle=False, show_turtle_intermediate_steps
 
     # for point in circle_points_24:
     #    print(point)
+
+    def make_dalam_points(n, inner_radius, outer_radius):
+        angle_incr = 2*math.pi/n
+        half_angle_incr = math.pi/n
+        dalam_tips_x = [
+            outer_radius*math.cos(i*angle_incr) for i in range(n)
+        ]
+        dalam_tips_y = [
+            outer_radius*math.sin(i*angle_incr) for i in range(n)
+        ]
+        dalam_tips = list(zip(dalam_tips_x, dalam_tips_y))
+
+        dalam_bases_x = [
+            inner_radius*math.cos(half_angle_incr + i*angle_incr) for i in range(n)
+        ]
+        dalam_bases_y = [
+            inner_radius*math.sin(half_angle_incr + i*angle_incr) for i in range(n)
+        ]
+        dalam_bases = list(zip(dalam_bases_x, dalam_bases_y))
+
+        dalam_intp1_x = [
+            inner_radius*math.cos(i*angle_incr) for i in range(n)
+        ]
+        dalam_intp1_y = [
+            inner_radius*math.sin(i*angle_incr) for i in range(n)
+        ]
+        dalam_intp1 = list(zip(dalam_intp1_x, dalam_intp1_y))
+
+        dalam_intp2_x = [
+            outer_radius*math.cos(half_angle_incr + i*angle_incr) for i in range(n)
+        ]
+        dalam_intp2_y = [
+            outer_radius*math.sin(half_angle_incr + i*angle_incr) for i in range(n)
+        ]
+        dalam_intp2 = list(zip(dalam_intp2_x, dalam_intp2_y))
+
+        return dalam_tips, dalam_intp1, dalam_intp2, dalam_bases
+
+    def make_dalam_curve(dalam_tips, dalam_intp1, dalam_intp2, dalam_bases):
+        n = len(dalam_tips)
+        dalam_points = []
+        for i, tip_pt in enumerate(dalam_tips):
+            base_pt = dalam_bases[(i+n-1)%n]
+            int_pt_1 = dalam_intp1[i]
+            int_pt_2 = dalam_intp2[(i+n-1)%n]
+            bpts1 = make_bezier_curve([base_pt, int_pt_2, int_pt_1, tip_pt])
+            dalam_points += bpts1
+
+            base_pt = dalam_bases[i]
+            int_pt_1 = dalam_intp1[i]
+            int_pt_2 = dalam_intp2[i]
+            bpts2 = make_bezier_curve([tip_pt, int_pt_1, int_pt_2, base_pt])
+            dalam_points += bpts2
+
+        return dalam_points
+
+    # Ashta dalam
+    ashta_dalam_width = (outer_dalam_radius - radius)/2
+    ashta_dalam_tips, ashta_dalam_intp1, ashta_dalam_intp2, ashta_dalam_bases = make_dalam_points(
+        8, radius, radius + ashta_dalam_width)
+
+    ashta_dalam_curve = make_dalam_curve(ashta_dalam_tips, ashta_dalam_intp1, ashta_dalam_intp2, ashta_dalam_bases)
+
+    if show_turtle_intermediate_steps:
+        draw_polygon(ashta_dalam_curve)
+
+    # Shodasha dalam
+    shodasha_dalam_width = ashta_dalam_width
+    (
+        shodasha_dalam_tips,
+        shodasha_dalam_intp1,
+        shodasha_dalam_intp2,
+        shodasha_dalam_bases
+    ) = make_dalam_points(
+        16, radius + ashta_dalam_width, radius + ashta_dalam_width + shodasha_dalam_width)
+
+    shodasha_dalam_curve = make_dalam_curve(
+        shodasha_dalam_tips,
+        shodasha_dalam_intp1,
+        shodasha_dalam_intp2,
+        shodasha_dalam_bases)
+
+    if show_turtle_intermediate_steps:
+        draw_polygon(shodasha_dalam_curve)
 
     right_point = circle_points_24[0]
     top_point = circle_points_24[6]
@@ -325,7 +431,7 @@ def build_sy_triangles(radius, show_turtle=False, show_turtle_intermediate_steps
     if show_turtle_intermediate_steps:
         draw_polygon(down_triangle4)
         draw_circle(origin_point, radius/100)
-
+    
 
     if t:
         if show_turtle_intermediate_steps:
@@ -348,37 +454,45 @@ def build_sy_triangles(radius, show_turtle=False, show_turtle_intermediate_steps
 
         t.screen.mainloop()
 
-    return up_triangle1, down_triangle1, up_triangle4, up_triangle2, down_triangle5, down_triangle2, up_triangle3, down_triangle3, down_triangle4
+    return (
+        shodasha_dalam_curve, ashta_dalam_curve,
+        up_triangle1, down_triangle1, up_triangle4,
+        up_triangle2, down_triangle5, down_triangle2,
+        up_triangle3, down_triangle3, down_triangle4
+    )
 
 
-def make_sy_outer_circle_image(outer_circle_radius):
-    img = Image.new('RGB', (2*outer_circle_radius+1, 2*outer_circle_radius+1), color = 'black')
+def make_sy_outer_circle_image(radius):
+    img = Image.new('RGB', (2*radius+1, 2*radius+1), color = 'black')
 
     draw = ImageDraw.Draw(img)
 
+    img_centre = (radius, radius)
+    outer_circle_radius = int(radius*.75)
     # Drawing a green circle on the image
-    draw.circle(xy = (outer_circle_radius, outer_circle_radius), radius=outer_circle_radius,
+    draw.circle(xy = img_centre, radius=outer_circle_radius,
                 fill = (255, 255, 255),
                 outline = (255, 255, 255),
                 width = 1)
     return img
 
-def make_sy_centre_circle_image(outer_circle_radius):
-    img = Image.new('RGB', (2*outer_circle_radius+1, 2*outer_circle_radius+1), color = 'black')
+def make_sy_centre_circle_image(radius):
+    img = Image.new('RGB', (2*radius+1, 2*radius+1), color = 'black')
 
     draw = ImageDraw.Draw(img)
 
+    img_centre = (radius, radius)
     # Drawing a green circle on the image
-    centre_circle_radius = outer_circle_radius/100
-    draw.circle(xy = (outer_circle_radius, outer_circle_radius), radius=centre_circle_radius,
+    centre_circle_radius = radius/100
+    draw.circle(xy = img_centre, radius=centre_circle_radius,
                 fill = (255, 255, 255),
                 outline = (255, 255, 255),
                 width = 1)
     return img
 
 
-def make_sy_triangle_image(sy_triangle, outer_circle_radius):
-    t_img = Image.new('RGB', (2*outer_circle_radius+1, 2*outer_circle_radius+1), color = 'black')
+def make_sy_triangle_image(sy_triangle, radius):
+    t_img = Image.new('RGB', (2*radius+1, 2*radius+1), color = 'black')
     t_draw = ImageDraw.Draw(t_img)
     t_draw.polygon(sy_triangle, fill = (255, 255, 255), outline = (255, 255, 255))
     return t_img
@@ -389,9 +503,9 @@ def to_image_coords(point, tx=0, ty=0):
 
 
 def generate_sy_png_outline(radius, sy_triangles):
-    img = Image.new('RGB', (2*radius+1, 2*radius+1), color = 'white')
+    img = Image.new('RGB', (int(2*radius+1), int(2*radius+1)), color = 'white')
     draw = ImageDraw.Draw(img)
-    draw.circle(xy = (radius, radius), radius=radius,
+    draw.circle(xy = (radius, radius), radius=int(radius*.75),
                 fill = None,
                 outline = (0, 0, 0),
                 width = 1)
@@ -406,7 +520,7 @@ def generate_sy_png_outline(radius, sy_triangles):
     
 
 def generate_sy_png_gif(radius, sy_triangles):
-    blank_image = Image.new('RGB', (2*radius+1, 2*radius+1), color = 'black')
+    blank_image = Image.new('RGB', (int(2*radius+1), int(2*radius+1)), color = 'black')
     circle_image = make_sy_outer_circle_image(radius)
     triangle_images = [
         make_sy_triangle_image(
@@ -414,7 +528,7 @@ def generate_sy_png_gif(radius, sy_triangles):
                     ) for syt in sy_triangles]
     centre_circle_image = make_sy_centre_circle_image(radius)
 
-    sub_image_list = [blank_image, circle_image] + triangle_images + [centre_circle_image]
+    sub_image_list = [blank_image] + triangle_images[:2] + [circle_image] + triangle_images[2:] + [centre_circle_image]
     sub_image_list_converted = [ximg.convert("1") for ximg in sub_image_list]
 
     combined_image = None
@@ -460,7 +574,7 @@ def generate_sy_svg(radius, sy_triangles):
 
 
 def main():
-    radius = 384
+    radius = 1024
     sy_triangles = build_sy_triangles(radius, show_turtle=False, show_turtle_intermediate_steps=True)
     generate_sy_png_outline(radius, sy_triangles)
     generate_sy_png_gif(radius, sy_triangles)
