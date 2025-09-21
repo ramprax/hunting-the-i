@@ -12,7 +12,10 @@
 ## Shree Yantra - Filled - PNG
 [<img src="sy-filled.png">](https://github.com/ramprax/hunting-the-i/blob/main/sy-filled.png)
 
-## Shree Yantra - SVG
+## Shree Yantra - Outline - SVG
+[<img src="sy-outline.svg">](https://github.com/ramprax/hunting-the-i/blob/main/sy-outline.svg)
+
+## Shree Yantra - Filled - SVG
 [<img src="sy.svg">](https://github.com/ramprax/hunting-the-i/blob/main/sy.svg)
 
 ## Shree Yantra - GIF
