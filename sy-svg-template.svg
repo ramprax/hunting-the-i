@@ -4,41 +4,35 @@
 >
     <!-- viewBox="0 0 1000 1000" -->
     <defs>
-        
-        <circle id="outerCircle" cx="{circle_centre_x}" cy="{circle_centre_y}" r="{circle_radius}" fill="blue"/>
-		<polygon id="upTriangleOne" points="{t1_points}" fill="blue"/>
-		<polygon id="upTriangleTwo" points="{t2_points}" fill="blue"/>
-		<polygon id="upTriangleThree" points="{t3_points}" fill="blue"/>
-		<polygon id="upTriangleFour" points="{t4_points}" fill="blue"/>
-		<polygon id="downTriangleOne" points="{t5_points}" fill="blue"/>
-		<polygon id="downTriangleTwo" points="{t6_points}" fill="blue"/>
-		<polygon id="downTriangleThree" points="{t7_points}" fill="blue"/>
-		<polygon id="downTriangleFour" points="{t8_points}" fill="blue"/>
-		<polygon id="downTriangleFive" points="{t9_points}" fill="blue"/>
-		<circle id="centreCircle" cx="{circle_centre_x}" cy="{circle_centre_y}" r="{centre_circle_radius}" fill="blue"/>
+        {shape_tags}
 		<filter id="imageXor">
-		  <feImage xlink:href="#outerCircle" result="inputOC" x="0" y="0" width="{inner_width}" height="{inner_height}"/>
-		  <feImage xlink:href="#upTriangleOne" result="inputU1" x="0" y="0" width="{inner_width}" height="{inner_height}"/>
-		  <feImage xlink:href="#upTriangleTwo" result="inputU2" x="0" y="0" width="{inner_width}" height="{inner_height}"/>
-		  <feImage xlink:href="#upTriangleThree" result="inputU3" x="0" y="0" width="{inner_width}" height="{inner_height}"/>
-		  <feImage xlink:href="#upTriangleFour" result="inputU4" x="0" y="0" width="{inner_width}" height="{inner_height}"/>
-		  <feImage xlink:href="#downTriangleOne" result="inputD1" x="0" y="0" width="{inner_width}" height="{inner_height}"/>
-		  <feImage xlink:href="#downTriangleTwo" result="inputD2" x="0" y="0" width="{inner_width}" height="{inner_height}"/>
-		  <feImage xlink:href="#downTriangleThree" result="inputD3" x="0" y="0" width="{inner_width}" height="{inner_height}"/>
-		  <feImage xlink:href="#downTriangleFour" result="inputD4" x="0" y="0" width="{inner_width}" height="{inner_height}"/>
-		  <feImage xlink:href="#downTriangleFive" result="inputD5" x="0" y="0" width="{inner_width}" height="{inner_height}"/>
-		  <feImage xlink:href="#centreCircle" result="inputCC" x="0" y="0" width="{inner_width}" height="{inner_height}"/>
-		  <feComposite in="SourceGraphic" in2="inputU1" operator="xor" result="resultU1"/>
-		  <feComposite in="resultU1" in2="inputU2" operator="xor" result="resultU2"/>
-		  <feComposite in="resultU2" in2="inputU3" operator="xor" result="resultU3"/>
-		  <feComposite in="resultU3" in2="inputU4" operator="xor" result="resultU4"/>
-		  <feComposite in="resultU4" in2="inputD1" operator="xor" result="resultD1"/>
-		  <feComposite in="resultD1" in2="inputD2" operator="xor" result="resultD2"/>
-		  <feComposite in="resultD2" in2="inputD3" operator="xor" result="resultD3"/>
-		  <feComposite in="resultD3" in2="inputD4" operator="xor" result="resultD4"/>
-		  <feComposite in="resultD4" in2="inputD5" operator="xor" result="resultD5"/>
-		  <feComposite in="resultD5" in2="inputOC" operator="xor" result="resultOC"/>
-		  <feComposite in="resultOC" in2="inputCC" operator="xor"/>
+		  <feImage xlink:href="#shape1" result="input1" x="0" y="0" width="{inner_width}" height="{inner_height}"/>
+		  <feImage xlink:href="#shape2" result="input2" x="0" y="0" width="{inner_width}" height="{inner_height}"/>
+		  <feImage xlink:href="#shape3" result="input3" x="0" y="0" width="{inner_width}" height="{inner_height}"/>
+		  <feImage xlink:href="#shape4" result="input4" x="0" y="0" width="{inner_width}" height="{inner_height}"/>
+		  <feImage xlink:href="#shape5" result="input5" x="0" y="0" width="{inner_width}" height="{inner_height}"/>
+		  <feImage xlink:href="#shape6" result="input6" x="0" y="0" width="{inner_width}" height="{inner_height}"/>
+		  <feImage xlink:href="#shape7" result="input7" x="0" y="0" width="{inner_width}" height="{inner_height}"/>
+		  <feImage xlink:href="#shape8" result="input8" x="0" y="0" width="{inner_width}" height="{inner_height}"/>
+		  <feImage xlink:href="#shape9" result="input9" x="0" y="0" width="{inner_width}" height="{inner_height}"/>
+		  <feImage xlink:href="#shape10" result="input10" x="0" y="0" width="{inner_width}" height="{inner_height}"/>
+		  <feImage xlink:href="#shape11" result="input11" x="0" y="0" width="{inner_width}" height="{inner_height}"/>
+		  <feImage xlink:href="#shape12" result="input12" x="0" y="0" width="{inner_width}" height="{inner_height}"/>
+		  <feImage xlink:href="#shape13" result="input13" x="0" y="0" width="{inner_width}" height="{inner_height}"/>
+
+		  <feComposite in="SourceGraphic" in2="input1" operator="xor" result="result1"/>
+		  <feComposite in="result1" in2="input2" operator="xor" result="result2"/>
+		  <feComposite in="result2" in2="input3" operator="xor" result="result3"/>
+		  <feComposite in="result3" in2="input4" operator="xor" result="result4"/>
+		  <feComposite in="result4" in2="input5" operator="xor" result="result5"/>
+		  <feComposite in="result5" in2="input6" operator="xor" result="result6"/>
+		  <feComposite in="result6" in2="input7" operator="xor" result="result7"/>
+		  <feComposite in="result7" in2="input8" operator="xor" result="result8"/>
+		  <feComposite in="result8" in2="input9" operator="xor" result="result9"/>
+		  <feComposite in="result9" in2="input10" operator="xor" result="result10"/>
+		  <feComposite in="result10" in2="input11" operator="xor" result="result11"/>
+		  <feComposite in="result11" in2="input12" operator="xor" result="result12"/>
+		  <feComposite in="result12" in2="input13" operator="xor"/>
 		  
 		</filter>
     </defs>
