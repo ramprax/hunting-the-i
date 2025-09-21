@@ -1,0 +1,37 @@
+<svg id="Layer_1" data-name="Layer 1" xmlns="http://www.w3.org/2000/svg"
+    width="{outer_width}" height="{outer_height}" font-family="Times New Roman"
+	xmlns:xlink="http://www.w3.org/1999/xlink"
+>
+    <!-- viewBox="0 0 1000 1000" -->
+    <defs>
+        {shape_tags}
+    </defs>
+    <g >
+        <!--    - The visual output of the XOR operation will appear here.
+             You might need a placeholder shape or simply let the filter define the output. -->
+			 <rect x="0" y="0" width="{outer_width}px" height="{outer_height}px" fill="white" />
+	 <g transform="translate({out_in_padding}, {out_in_padding})">
+		 <!-- <rect x="0" y="0" width="{inner_width}px" height="{inner_height}px" fill="white"/> -->
+         <use href="#shape1" x="0" y="0" width="{inner_width}px" height="{inner_height}px" />
+         <use href="#shape2" x="0" y="0" width="{inner_width}px" height="{inner_height}px" />
+         <use href="#shape3" x="0" y="0" width="{inner_width}px" height="{inner_height}px" />
+         <use href="#shape4" x="0" y="0" width="{inner_width}px" height="{inner_height}px" />
+         <use href="#shape5" x="0" y="0" width="{inner_width}px" height="{inner_height}px" />
+         <use href="#shape6" x="0" y="0" width="{inner_width}px" height="{inner_height}px" />
+         <use href="#shape7" x="0" y="0" width="{inner_width}px" height="{inner_height}px" />
+         <use href="#shape8" x="0" y="0" width="{inner_width}px" height="{inner_height}px" />
+         <use href="#shape9" x="0" y="0" width="{inner_width}px" height="{inner_height}px" />
+         <use href="#shape10" x="0" y="0" width="{inner_width}px" height="{inner_height}px" />
+         <use href="#shape11" x="0" y="0" width="{inner_width}px" height="{inner_height}px" />
+         <use href="#shape12" x="0" y="0" width="{inner_width}px" height="{inner_height}px" />
+         <use href="#shape13" x="0" y="0" width="{inner_width}px" height="{inner_height}px" />
+         <use href="#shape14" x="0" y="0" width="{inner_width}px" height="{inner_height}px" />
+         <use href="#shape15" x="0" y="0" width="{inner_width}px" height="{inner_height}px" />
+         <use href="#shape16" x="0" y="0" width="{inner_width}px" height="{inner_height}px" />
+         <use href="#shape17" x="0" y="0" width="{inner_width}px" height="{inner_height}px" />
+         <use href="#shape18" x="0" y="0" width="{inner_width}px" height="{inner_height}px" />
+         <use href="#shape19" x="0" y="0" width="{inner_width}px" height="{inner_height}px" />
+	 </g>
+    </g>
+
+</svg>

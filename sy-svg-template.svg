@@ -19,6 +19,12 @@
 		  <feImage xlink:href="#shape11" result="input11" x="0" y="0" width="{inner_width}" height="{inner_height}"/>
 		  <feImage xlink:href="#shape12" result="input12" x="0" y="0" width="{inner_width}" height="{inner_height}"/>
 		  <feImage xlink:href="#shape13" result="input13" x="0" y="0" width="{inner_width}" height="{inner_height}"/>
+		  <feImage xlink:href="#shape14" result="input14" x="0" y="0" width="{inner_width}" height="{inner_height}"/>
+		  <feImage xlink:href="#shape15" result="input15" x="0" y="0" width="{inner_width}" height="{inner_height}"/>
+		  <feImage xlink:href="#shape16" result="input16" x="0" y="0" width="{inner_width}" height="{inner_height}"/>
+		  <feImage xlink:href="#shape17" result="input17" x="0" y="0" width="{inner_width}" height="{inner_height}"/>
+		  <feImage xlink:href="#shape18" result="input18" x="0" y="0" width="{inner_width}" height="{inner_height}"/>
+		  <feImage xlink:href="#shape19" result="input19" x="0" y="0" width="{inner_width}" height="{inner_height}"/>
 
 		  <feComposite in="SourceGraphic" in2="input1" operator="xor" result="result1"/>
 		  <feComposite in="result1" in2="input2" operator="xor" result="result2"/>
@@ -32,7 +38,13 @@
 		  <feComposite in="result9" in2="input10" operator="xor" result="result10"/>
 		  <feComposite in="result10" in2="input11" operator="xor" result="result11"/>
 		  <feComposite in="result11" in2="input12" operator="xor" result="result12"/>
-		  <feComposite in="result12" in2="input13" operator="xor"/>
+		  <feComposite in="result12" in2="input13" operator="xor" result="result13"/>
+		  <feComposite in="result13" in2="input14" operator="xor" result="result14"/>
+		  <feComposite in="result14" in2="input15" operator="xor" result="result15"/>
+		  <feComposite in="result15" in2="input16" operator="xor" result="result16"/>
+		  <feComposite in="result16" in2="input17" operator="xor" result="result17"/>
+		  <feComposite in="result17" in2="input18" operator="xor" result="result18"/>
+		  <feComposite in="result18" in2="input19" operator="xor"/>
 		  
 		</filter>
     </defs>

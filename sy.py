@@ -27,6 +27,14 @@ def mirror_up_down(point):
     x, y = point
     return x, -y
 
+def mirror_xy(point):
+    """
+    Get the reflection point when Y=X line is the mirror; Diagonal
+    """
+    x, y = point
+    return y, x
+
+
 def intersection_point(line1, line2):
     print('Computing intersection for:', line1, line2)
     ((ax1, ay1), (ax2, ay2)) = line1
@@ -64,7 +72,7 @@ class Shape(abc.ABC):
         raise NotImplementedError()
 
     @abc.abstractmethod
-    def svg_draw(self, element_id, image_centre_xy, fill):
+    def svg_draw(self, element_id, image_centre_xy, fill, stroke):
         raise NotImplementedError()
 
 class Circle(Shape):
@@ -72,6 +80,10 @@ class Circle(Shape):
         cx, cy = centre_xy
         self._centre_xy = cx, cy
         self._radius = radius
+    
+    @property
+    def radius(self):
+        return self._radius
     
     def turtle_draw(self, tt: Turtle):
         if not tt:
@@ -88,10 +100,10 @@ class Circle(Shape):
                 outline = outline,
                 width = width)
     
-    def svg_draw(self, element_id, image_centre_xy, fill):
+    def svg_draw(self, element_id, image_centre_xy, fill, stroke):
         c_xy = super().to_image_coords(self._centre_xy, image_centre_xy)
         cx, cy = c_xy
-        return f'''<circle id="{element_id}" cx="{cx}" cy="{cy}" r="{math.ceil(self._radius)}" fill="{fill}"/>'''
+        return f'''<circle id="{element_id}" cx="{cx}" cy="{cy}" r="{math.ceil(self._radius)}" fill="{fill}" stroke="{stroke}"/>'''
 
 
 class Polygon(Shape):
@@ -120,10 +132,10 @@ class Polygon(Shape):
             image_coord_points = self._points[:]
         img_draw.polygon(image_coord_points, fill = fill, outline = outline, width=width)
 
-    def svg_draw(self, element_id, image_centre_xy, fill):
+    def svg_draw(self, element_id, image_centre_xy, fill, stroke):
         image_coord_points = [super().to_image_coords(xy, image_centre_xy) for xy in self._points] 
         image_coord_points_str = ' '.join([','.join([str(v) for v in pt]) for pt in image_coord_points])
-        return f'''<polygon id="{element_id}" points="{image_coord_points_str}" fill="{fill}"/>'''
+        return f'''<polygon id="{element_id}" points="{image_coord_points_str}" fill="{fill}" stroke="{stroke}"/>'''
 
 
 class BezierCurve(Shape):
@@ -170,14 +182,14 @@ class BezierCurve(Shape):
         curve_points = self.curve_points(to_image_coords_ox_oy=image_centre_xy)
         img_draw.line(curve_points, fill=fill, width=width)
     
-    def svg_draw(self, element_id, image_centre_xy, fill):
+    def svg_draw(self, element_id, image_centre_xy, fill, stroke):
         if image_centre_xy:
             guide_points = [to_image_coords(pt, image_centre_xy) for pt in self._guide_points]
         else:
             guide_points = self._guide_points
         start_x, start_y = guide_points[0]
         guide_points_str = ', '.join([' '.join(xy) for xy in guide_points[1:]])
-        svg_bezier_path_str = f'''<path id="{element_id}" d="M {start_x} {start_y} C {guide_points_str}" fill="{fill}" />'''
+        svg_bezier_path_str = f'''<path id="{element_id}" d="M {start_x} {start_y} C {guide_points_str}" fill="{fill}" stroke="{stroke}"/>'''
         return svg_bezier_path_str
 
 class Dalam(Shape):
@@ -264,7 +276,7 @@ class Dalam(Shape):
         c_pts = self.curve_points(image_centre_xy)
         Polygon(c_pts).pil_draw(img_draw, None, fill=fill, outline=outline, width=width)
     
-    def svg_draw(self, element_id, image_centre_xy, fill):
+    def svg_draw(self, element_id, image_centre_xy, fill, stroke):
         bzs = self.make_dalam_beziers(image_centre_xy)
         path_instructions = []
         last_end_pt = None
@@ -282,13 +294,151 @@ class Dalam(Shape):
 
         path_instruction_str = ' '.join(path_instructions)
 
-        svg_dalam_path_str = f'''<path id="{element_id}" d="{path_instruction_str}" fill="{fill}" />'''
+        svg_dalam_path_str = f'''<path id="{element_id}" d="{path_instruction_str}" fill="{fill}" stroke="{stroke}"/>'''
         return svg_dalam_path_str
 
 
-def build_sy_shapes(outer_dalam_radius, show_turtle=False, show_turtle_intermediate_steps=False) -> Iterable[Shape]:
-    radius = int(outer_dalam_radius*.75)
+def sy_bhupura_shapes(radius, turtle, show_turtle=True, show_intermediate_steps=True):
+
+    c = Circle((0, 0), radius=radius)
+    if show_intermediate_steps:
+        c.turtle_draw(turtle)
+    
+    # square_pts = []
+    # angle = math.pi/4
+    sin_cos_45 = 1/(2**.5)
+    square_pts = (
+        (radius*sin_cos_45, radius*sin_cos_45),
+        (-radius*sin_cos_45, radius*sin_cos_45),
+        (-radius*sin_cos_45, -radius*sin_cos_45),
+        (radius*sin_cos_45, -radius*sin_cos_45),
+    )
+    
+    sq = Polygon(square_pts)
+    if show_intermediate_steps:
+        sq.turtle_draw(turtle)
+
+    sq_side = 2*radius*sin_cos_45
+    sin_t = 1/2**1.5 # (sq_side/4)/radius
+    cos_t = (7**.5)/2**1.5 # sqrt(1-(sin_t)^2)
+
+    right_rectangle_points = (
+        (radius*cos_t, radius*sin_t),
+        (sq_side/2,    radius*sin_t),
+        (sq_side/2,    -radius*sin_t),
+        (radius*cos_t, -radius*sin_t),
+    )
+    right_rect = Polygon(right_rectangle_points)
+    if show_intermediate_steps:
+        right_rect.turtle_draw(turtle)
+    
+    top_rectangle_points = tuple(
+        mirror_xy(xy) for xy in right_rectangle_points
+    )
+    top_rect = Polygon(top_rectangle_points)
+    if show_intermediate_steps:
+        top_rect.turtle_draw(turtle)
+    
+    left_rectangle_points = tuple(
+        mirror_left_right(xy) for xy in right_rectangle_points
+    )
+    left_rect = Polygon(left_rectangle_points)
+    if show_intermediate_steps:
+        left_rect.turtle_draw(turtle)
+
+    bottom_rectangle_points = tuple(
+        mirror_up_down(xy) for xy in top_rectangle_points
+    )
+    bottom_rect = Polygon(bottom_rectangle_points)
+    if show_intermediate_steps:
+        bottom_rect.turtle_draw(turtle)
+
+    right_neck_x = radius*cos_t - sq_side/8
+    right_neck_y = sq_side/8
+
+    one_eigth_polygon = (
+        (radius*cos_t, 0),
+        (radius*cos_t, sq_side/4),
+        (right_neck_x, sq_side/4),
+        (right_neck_x, right_neck_y),
+        (sq_side/2, right_neck_y),
+        (sq_side/2, sq_side/2),
+    )
+    boundary_polygon = full_polygon_from_1_8th(one_eigth_polygon)
+    boundary_polygon.turtle_draw(turtle)
+
+    # boundary thickness
+    bt = right_neck_x - sq_side/2
+    bt_half = bt/2
+    middle_boundary_1_8th = (
+        (radius*cos_t - bt_half, 0),
+        (radius*cos_t - bt_half, sq_side/4 - bt_half),
+        (right_neck_x + bt_half, sq_side/4 - bt_half),
+        (right_neck_x + bt_half, right_neck_y - bt_half),
+        (sq_side/2 - bt_half, right_neck_y - bt_half),
+        (sq_side/2 - bt_half, sq_side/2 - bt_half),
+    )
+    middle_boundary_polygon = full_polygon_from_1_8th(middle_boundary_1_8th)
+    middle_boundary_polygon.turtle_draw(turtle)
+
+    inner_boundary_1_8th = (
+        (radius*cos_t - bt, 0),
+        (radius*cos_t - bt, sq_side/4 - bt),
+        (right_neck_x + bt, sq_side/4 - bt),
+        (right_neck_x + bt, right_neck_y - bt),
+        (sq_side/2 - bt, right_neck_y - bt),
+        (sq_side/2 - bt, sq_side/2 - bt),
+    )
+    inner_boundary_polygon = full_polygon_from_1_8th(inner_boundary_1_8th)
+    inner_boundary_polygon.turtle_draw(turtle)
+
+    inner_b_corner = (sq_side/2 - bt, right_neck_y - bt)
+    corner_dist = ((sq_side/2 - bt)**2 + (right_neck_y - bt)**2)**0.5
+    circle_corner_touch = Circle((0, 0), corner_dist)
+    circle_corner_touch.turtle_draw(turtle)
+
+    circle_1_radius = sq_side/2 - bt
+    circle_1 = Circle((0, 0), circle_1_radius)
+    circle_1.turtle_draw(turtle)
+
+    circle_gap = (radius*cos_t - bt) - (sq_side/2)
+    circle_2 = Circle((0, 0), circle_1_radius - circle_gap/2)
+    circle_2.turtle_draw(turtle)
+
+    circle_3 = Circle((0, 0), circle_1_radius - circle_gap)
+    circle_3.turtle_draw(turtle)
+
+    return (
+        boundary_polygon, middle_boundary_polygon, inner_boundary_polygon,
+        circle_corner_touch, circle_1, circle_2, circle_3,
+    )
+
+
+def full_polygon_from_1_8th(poly_points_1_8th):
+    poly_points_1_8th_2 = tuple(reversed(tuple(mirror_xy(xy) for xy in poly_points_1_8th)))
+    poly_points_1_4th = poly_points_1_8th + poly_points_1_8th_2
+    
+    poly_points_1_4th_2 = tuple(reversed(tuple(mirror_left_right(xy) for xy in poly_points_1_4th)))
+    poly_points_half = poly_points_1_4th + poly_points_1_4th_2
+
+    poly_points_half_2 = tuple(reversed(tuple(mirror_up_down(xy) for xy in poly_points_half)))
+    poly_points = poly_points_half + poly_points_half_2
+
+    return Polygon(poly_points)
+
+
+def build_sy_shapes(outer_radius, show_turtle=False, show_turtle_intermediate_steps=False) -> Iterable[Shape]:
     turtle = Turtle() if show_turtle else None
+    
+    bhupura_shapes = sy_bhupura_shapes(outer_radius, turtle, show_turtle=show_turtle, show_intermediate_steps=show_turtle_intermediate_steps)
+    
+    dalam_circle1, dalam_circle2, dalam_circle3 = bhupura_shapes[-3:]
+    
+    shodasha_dalam_radius = dalam_circle1.radius
+    shodasha_dalam_width = dalam_circle1.radius - dalam_circle2.radius
+    ashta_dalam_width = dalam_circle2.radius - dalam_circle3.radius
+
+    radius = dalam_circle3.radius
 
     #_ = input('Hit <Enter> to start')
 
@@ -330,24 +480,22 @@ def build_sy_shapes(outer_dalam_radius, show_turtle=False, show_turtle_intermedi
 
     circle_points_24 = [(round(radius * math.cos(i*math.pi/12), 6), round(radius * math.sin(i*math.pi/12), 6)) for i in range(24)]
 
-    outer_circle = Circle(origin_point, radius)
-    if show_turtle_intermediate_steps:
-        # draw_circle(origin_point, radius)
-        outer_circle.turtle_draw(turtle)
+    # outer_circle = Circle(origin_point, radius)
+    # if show_turtle_intermediate_steps:
+    #     # draw_circle(origin_point, radius)
+    #     outer_circle.turtle_draw(turtle)
 
     # for point in circle_points_24:
     #    print(point)
 
     # Ashta dalam
-    ashta_dalam_width = (outer_dalam_radius - radius)/2
     ashta_dalam = Dalam(8, radius, radius + ashta_dalam_width)
 
     if show_turtle_intermediate_steps:
         ashta_dalam.turtle_draw(turtle)
 
     # Shodasha dalam
-    shodasha_dalam_width = ashta_dalam_width
-    shodasha_dalam = Dalam(16, radius + ashta_dalam_width, radius + ashta_dalam_width + shodasha_dalam_width)
+    shodasha_dalam = Dalam(16, shodasha_dalam_radius - shodasha_dalam_width, shodasha_dalam_radius)
 
     if show_turtle_intermediate_steps:
         shodasha_dalam.turtle_draw(turtle)
@@ -599,8 +747,8 @@ def build_sy_shapes(outer_dalam_radius, show_turtle=False, show_turtle_intermedi
         centre_circle.turtle_draw(turtle)
         # draw_circle(origin_point, radius/100)
     
-    final_shapes = (
-        shodasha_dalam, ashta_dalam, outer_circle,
+    final_shapes = bhupura_shapes + (
+        shodasha_dalam, ashta_dalam,
         up_triangle1, down_triangle1, up_triangle4,
         up_triangle2, down_triangle5, down_triangle2,
         up_triangle3, down_triangle3, down_triangle4,
@@ -723,7 +871,7 @@ def generate_sy_png_gif(radius, sy_shapes):
 
 def generate_sy_svg(radius, sy_shapes):
     image_centre_xy = (radius, radius)
-    shape_tags = [sh.svg_draw(f'shape{i+1}', image_centre_xy, fill="blue") for i, sh in enumerate(sy_shapes)]
+    shape_tags = [sh.svg_draw(f'shape{i+1}', image_centre_xy, fill="blue", stroke="blue") for i, sh in enumerate(sy_shapes)]
 
     format_params = {
         'outer_width': 2*radius+10, 
@@ -738,10 +886,24 @@ def generate_sy_svg(radius, sy_shapes):
     svg_str = template_svg_str.format_map(format_params)
     pathlib.Path(f'sy-{radius}.svg').write_text(svg_str)
 
+    shape_outline_tags = [sh.svg_draw(f'shape{i+1}', image_centre_xy, fill="transparent", stroke="blue") for i, sh in enumerate(sy_shapes)]
+    format_params = {
+        'outer_width': 2*radius+10, 
+        'outer_height': 2*radius+10,
+        'inner_width': 2*radius,
+        'inner_height': 2*radius,
+        'out_in_padding': 5,
+        'shape_tags': '\n'.join(shape_outline_tags),
+    }
+    template_svg_str = pathlib.Path('sy-svg-outline-template.svg').read_text()
+    svg_str = template_svg_str.format_map(format_params)
+    pathlib.Path(f'sy-{radius}-outline.svg').write_text(svg_str)
+
+
 
 def main():
-    radius = 320
-    sy_shapes = build_sy_shapes(radius, show_turtle=False, show_turtle_intermediate_steps=True)
+    radius = 512
+    sy_shapes = build_sy_shapes(radius, show_turtle=False, show_turtle_intermediate_steps=False)
     generate_sy_png_outline(radius, sy_shapes)
     generate_sy_png_gif(radius, sy_shapes)
     generate_sy_svg(radius, sy_shapes)
