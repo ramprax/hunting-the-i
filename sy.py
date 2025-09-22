@@ -1,9 +1,13 @@
+import time
 from turtle import *
 import math
 import pathlib
+from functools import partial
 from typing import Iterable
 
-from PIL import Image, ImageDraw, ImageChops
+from concurrent.futures import ThreadPoolExecutor, wait
+
+from PIL import Image, ImageDraw, ImageChops, ImageGrab
 
 # Mathematical co-ord system:
 #  - right is +ve x
@@ -365,7 +369,8 @@ def sy_bhupura_shapes(radius, turtle, show_turtle=True, show_intermediate_steps=
         (sq_side/2, sq_side/2),
     )
     boundary_polygon = full_polygon_from_1_8th(one_eigth_polygon)
-    boundary_polygon.turtle_draw(turtle)
+    if show_intermediate_steps:
+        boundary_polygon.turtle_draw(turtle)
 
     # boundary thickness
     bt = right_neck_x - sq_side/2
@@ -379,7 +384,8 @@ def sy_bhupura_shapes(radius, turtle, show_turtle=True, show_intermediate_steps=
         (sq_side/2 - bt_half, sq_side/2 - bt_half),
     )
     middle_boundary_polygon = full_polygon_from_1_8th(middle_boundary_1_8th)
-    middle_boundary_polygon.turtle_draw(turtle)
+    if show_intermediate_steps:
+        middle_boundary_polygon.turtle_draw(turtle)
 
     inner_boundary_1_8th = (
         (radius*cos_t - bt, 0),
@@ -390,23 +396,29 @@ def sy_bhupura_shapes(radius, turtle, show_turtle=True, show_intermediate_steps=
         (sq_side/2 - bt, sq_side/2 - bt),
     )
     inner_boundary_polygon = full_polygon_from_1_8th(inner_boundary_1_8th)
-    inner_boundary_polygon.turtle_draw(turtle)
+    if show_intermediate_steps:
+        inner_boundary_polygon.turtle_draw(turtle)
 
     inner_b_corner = (sq_side/2 - bt, right_neck_y - bt)
     corner_dist = ((sq_side/2 - bt)**2 + (right_neck_y - bt)**2)**0.5
     circle_corner_touch = Circle((0, 0), corner_dist)
-    circle_corner_touch.turtle_draw(turtle)
+    if show_intermediate_steps:
+        circle_corner_touch.turtle_draw(turtle)
 
-    circle_1_radius = sq_side/2 - bt
+    # circle_1_radius = sq_side/2 - bt
+    circle_1_radius = corner_dist - bt_half
     circle_1 = Circle((0, 0), circle_1_radius)
-    circle_1.turtle_draw(turtle)
+    if show_intermediate_steps:
+        circle_1.turtle_draw(turtle)
 
     circle_gap = (radius*cos_t - bt) - (sq_side/2)
     circle_2 = Circle((0, 0), circle_1_radius - circle_gap/2)
-    circle_2.turtle_draw(turtle)
+    if show_intermediate_steps:
+        circle_2.turtle_draw(turtle)
 
     circle_3 = Circle((0, 0), circle_1_radius - circle_gap)
-    circle_3.turtle_draw(turtle)
+    if show_intermediate_steps:
+        circle_3.turtle_draw(turtle)
 
     return (
         boundary_polygon, middle_boundary_polygon, inner_boundary_polygon,
@@ -427,9 +439,11 @@ def full_polygon_from_1_8th(poly_points_1_8th):
     return Polygon(poly_points)
 
 
-def build_sy_shapes(outer_radius, show_turtle=False, show_turtle_intermediate_steps=False) -> Iterable[Shape]:
+def build_sy_shapes(outer_radius, show_turtle=False, show_turtle_intermediate_steps=False, enable_screen_capture=False) -> Iterable[Shape]:
     turtle = Turtle() if show_turtle else None
-    
+    if turtle:
+        turtle.home()
+
     bhupura_shapes = sy_bhupura_shapes(outer_radius, turtle, show_turtle=show_turtle, show_intermediate_steps=show_turtle_intermediate_steps)
     
     dalam_circle1, dalam_circle2, dalam_circle3 = bhupura_shapes[-3:]
@@ -474,9 +488,6 @@ def build_sy_shapes(outer_radius, show_turtle=False, show_turtle_intermediate_st
 
 
     origin_point = (0, 0)
-
-    if turtle:
-        turtle.home()
 
     circle_points_24 = [(round(radius * math.cos(i*math.pi/12), 6), round(radius * math.sin(i*math.pi/12), 6)) for i in range(24)]
 
@@ -772,12 +783,74 @@ def build_sy_shapes(outer_radius, show_turtle=False, show_turtle_intermediate_st
         # draw_polygon(down_triangle4)
         # draw_circle(origin_point, radius/100)
 
-        for s in final_shapes:
-            s.turtle_draw(turtle)
+        should_capture = [enable_screen_capture]
+        capture_count = 0
+        capture_interval = 100
+        canvas = turtle.screen.getcanvas()
 
+        output_dir = pathlib.Path('output')
+        output_dir.mkdir(exist_ok=True)
+
+        xy_val = outer_radius+10
+        wh_val = 2*outer_radius + 20
+        capture_x, capture_y, capture_width, capture_height = -xy_val, -xy_val, wh_val, wh_val
+        print(capture_x, capture_y, capture_width, capture_height)
+
+        tpe = ThreadPoolExecutor()
+        futures = []
+
+        def eps_to_png(eps_file, png_file):
+            print(f'Converting {eps_file} to png')
+            psimage = Image.open(eps_file)
+            print(f'{eps_file} WxH:', psimage.width, psimage.height)
+            # psimage.resize()
+            psimage.save(png_file) # or any other image format that PIL supports.
+            print(f'eps_to_png({eps_file}): Done')
+
+        def do_capture(capture_count):
+            ps_filename = output_dir / f'capture_{capture_count:04d}.eps'
+            # print(capture_x, capture_y, capture_width, capture_height)
+            canvas.postscript(file=str(ps_filename), x=capture_x, y=capture_y, width=capture_width, height=capture_height)
+            if should_capture[0]:
+                turtle.screen.ontimer(partial(do_capture, capture_count+1), t=capture_interval)
+            else:
+                for cc in range(capture_count+1):
+                    ps_filename = output_dir / f'capture_{cc:04d}.eps'
+                    png_filename = output_dir / f'capture_{cc:04d}.png'
+                    ft = tpe.submit(eps_to_png, ps_filename, png_filename)
+                    futures.append(ft)
+
+            print('capture_count:', capture_count)
+
+        turtle.clear()
         turtle.teleport(0, 0)
 
+        if should_capture[0]:
+            turtle.screen.ontimer(partial(do_capture, capture_count), t=capture_interval)
+
+        def _stop_capture():
+            should_capture[0] = False
+
+        def draw_final_shapes():
+            turtle.clear()
+            for s in final_shapes[:]:
+                s.turtle_draw(turtle)
+
+            turtle.teleport(0, 0)
+            turtle.screen.ontimer(_stop_capture, t=3000)
+
+        wait_time = 5
+        turtle.screen.ontimer(draw_final_shapes, t=wait_time*1000)
+
+        def _count_down(seconds_left):
+            turtle.clear()
+            turtle.write(seconds_left)
+        
+        for i in range(wait_time-1):
+            turtle.screen.ontimer(partial(_count_down, wait_time-1-i), t=i*1000)
+
         turtle.screen.mainloop()
+        wait(futures)
 
     return final_shapes
 
@@ -900,10 +973,9 @@ def generate_sy_svg(radius, sy_shapes):
     pathlib.Path(f'sy-{radius}-outline.svg').write_text(svg_str)
 
 
-
 def main():
     radius = 512
-    sy_shapes = build_sy_shapes(radius, show_turtle=False, show_turtle_intermediate_steps=False)
+    sy_shapes = build_sy_shapes(radius, show_turtle=True, show_turtle_intermediate_steps=False, enable_screen_capture=True)
     generate_sy_png_outline(radius, sy_shapes)
     generate_sy_png_gif(radius, sy_shapes)
     generate_sy_svg(radius, sy_shapes)
