@@ -22,4 +22,4 @@
 [<img src="sy.gif">](https://github.com/ramprax/hunting-the-i/blob/main/sy.gif)
 
 ## Shree Yantra - Python Turtle Video Capture
-[Shree Yantra - Python Turtle Video Capture on Youtube](https://www.youtube.com/watch?v=Czjn_QCBgK4)]
+[Shree Yantra - Python Turtle Video Capture on Youtube](https://www.youtube.com/watch?v=Czjn_QCBgK4)
