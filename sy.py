@@ -7,7 +7,9 @@ from typing import Iterable
 
 from concurrent.futures import ThreadPoolExecutor, wait
 
-from PIL import Image, ImageDraw, ImageChops, ImageGrab
+from PIL import Image, ImageDraw, ImageChops
+
+(OUTPUT_DIR := pathlib.Path('output')).mkdir(exist_ok=True)
 
 # Mathematical co-ord system:
 #  - right is +ve x
@@ -446,6 +448,7 @@ def build_sy_shapes(outer_radius, show_turtle=False, show_turtle_intermediate_st
 
     bhupura_shapes = sy_bhupura_shapes(outer_radius, turtle, show_turtle=show_turtle, show_intermediate_steps=show_turtle_intermediate_steps)
     
+    bhupura_no_dalams = bhupura_shapes[:-3]
     dalam_circle1, dalam_circle2, dalam_circle3 = bhupura_shapes[-3:]
     
     shodasha_dalam_radius = dalam_circle1.radius
@@ -758,8 +761,10 @@ def build_sy_shapes(outer_radius, show_turtle=False, show_turtle_intermediate_st
         centre_circle.turtle_draw(turtle)
         # draw_circle(origin_point, radius/100)
     
-    final_shapes = bhupura_shapes + (
-        shodasha_dalam, ashta_dalam,
+    final_shapes = bhupura_no_dalams + (
+        dalam_circle1, shodasha_dalam,
+        dalam_circle2, ashta_dalam,
+        dalam_circle3,
         up_triangle1, down_triangle1, up_triangle4,
         up_triangle2, down_triangle5, down_triangle2,
         up_triangle3, down_triangle3, down_triangle4,
@@ -788,9 +793,6 @@ def build_sy_shapes(outer_radius, show_turtle=False, show_turtle_intermediate_st
         capture_interval = 100
         canvas = turtle.screen.getcanvas()
 
-        output_dir = pathlib.Path('output')
-        output_dir.mkdir(exist_ok=True)
-
         xy_val = outer_radius+10
         wh_val = 2*outer_radius + 20
         capture_x, capture_y, capture_width, capture_height = -xy_val, -xy_val, wh_val, wh_val
@@ -808,15 +810,15 @@ def build_sy_shapes(outer_radius, show_turtle=False, show_turtle_intermediate_st
             print(f'eps_to_png({eps_file}): Done')
 
         def do_capture(capture_count):
-            ps_filename = output_dir / f'capture_{capture_count:04d}.eps'
+            ps_filename = OUTPUT_DIR / f'capture_{capture_count:04d}.eps'
             # print(capture_x, capture_y, capture_width, capture_height)
             canvas.postscript(file=str(ps_filename), x=capture_x, y=capture_y, width=capture_width, height=capture_height)
             if should_capture[0]:
                 turtle.screen.ontimer(partial(do_capture, capture_count+1), t=capture_interval)
             else:
                 for cc in range(capture_count+1):
-                    ps_filename = output_dir / f'capture_{cc:04d}.eps'
-                    png_filename = output_dir / f'capture_{cc:04d}.png'
+                    ps_filename = OUTPUT_DIR / f'capture_{cc:04d}.eps'
+                    png_filename = OUTPUT_DIR / f'capture_{cc:04d}.png'
                     ft = tpe.submit(eps_to_png, ps_filename, png_filename)
                     futures.append(ft)
 
@@ -842,15 +844,21 @@ def build_sy_shapes(outer_radius, show_turtle=False, show_turtle_intermediate_st
         wait_time = 5
         turtle.screen.ontimer(draw_final_shapes, t=wait_time*1000)
 
-        def _count_down(seconds_left):
+        def _show_count_down(seconds_left):
             turtle.clear()
             turtle.write(seconds_left)
+            if seconds_left > 1:
+                turtle.screen.ontimer(partial(_show_count_down, seconds_left-1), t=1000)
         
-        for i in range(wait_time-1):
-            turtle.screen.ontimer(partial(_count_down, wait_time-1-i), t=i*1000)
+        turtle.screen.ontimer(partial(_show_count_down, wait_time-1))
 
         turtle.screen.mainloop()
         wait(futures)
+        
+        if enable_screen_capture:
+            print('Turtle captured PNG frames generated:', len(futures))
+            print('Use following command to generate video:')
+            print('''ffmpeg -framerate 24 -i "capture_%04d.png" -c:v libx264 -vf "pad=ceil(iw/2)*2:ceil(ih/2)*2" -pix_fmt yuv420p out.mp4''')
 
     return final_shapes
 
@@ -906,10 +914,10 @@ def generate_sy_png_outline(radius, sy_shapes: Iterable[Shape]):
     for s in sy_shapes:
         s.pil_draw(draw, image_centre_xy, fill=fill, outline=outline, width=width)
 
-    img.save(f'sy-{radius}.png')
+    img.save(OUTPUT_DIR / f'sy-{radius}.png')
     
 
-def generate_sy_png_gif(radius, sy_shapes):
+def generate_sy_png_gif(radius, sy_shapes, save_individual_gif_frames=False):
     blank_image = Image.new('RGB', (int(2*radius+1), int(2*radius+1)), color = 'black')
     image_centre_xy = (radius, radius)
     fill = (255, 255, 255)
@@ -935,11 +943,20 @@ def generate_sy_png_gif(radius, sy_shapes):
 
     # xor_result_image.show()
     gif_frames.append(combined_image)
+    gif_frames.append(combined_image)
 
-    combined_image.save(f'sy-{radius}-filled.png')
+    combined_image.save(OUTPUT_DIR / f'sy-{radius}-filled.png')
 
-    gif_frames[0].save(f'sy-{radius}-filled.gif', save_all = True, append_images = gif_frames[1:],
+    gif_frames[0].save(OUTPUT_DIR / f'sy-{radius}-filled.gif', save_all = True, append_images = gif_frames[1:],
                         optimize = False, duration = 1000, loop=0)
+    if save_individual_gif_frames:
+        num_images = len(gif_frames)
+        digits = int(math.log10(num_images)+1)
+        for frame_idx, frame_image in enumerate(gif_frames):
+            frame_image.save(OUTPUT_DIR / f'sy-{radius}-filled-frame-{frame_idx:0>{digits}}.png')
+        print('Filled image PNG frames generated:', num_images)
+        print('Use following command to generate video:')
+        print(f'''ffmpeg -framerate 2 -i "sy-{radius}-filled-frame-%0{digits}d.png" -c:v libx264 -vf "pad=ceil(iw/2)*2:ceil(ih/2)*2" -pix_fmt yuv420p out-{radius}-filled.mp4''')
 
 
 def generate_sy_svg(radius, sy_shapes):
@@ -957,7 +974,7 @@ def generate_sy_svg(radius, sy_shapes):
     
     template_svg_str = pathlib.Path('sy-svg-template.svg').read_text()
     svg_str = template_svg_str.format_map(format_params)
-    pathlib.Path(f'sy-{radius}.svg').write_text(svg_str)
+    pathlib.Path(OUTPUT_DIR / f'sy-{radius}.svg').write_text(svg_str)
 
     shape_outline_tags = [sh.svg_draw(f'shape{i+1}', image_centre_xy, fill="transparent", stroke="blue") for i, sh in enumerate(sy_shapes)]
     format_params = {
@@ -970,12 +987,12 @@ def generate_sy_svg(radius, sy_shapes):
     }
     template_svg_str = pathlib.Path('sy-svg-outline-template.svg').read_text()
     svg_str = template_svg_str.format_map(format_params)
-    pathlib.Path(f'sy-{radius}-outline.svg').write_text(svg_str)
+    pathlib.Path(OUTPUT_DIR / f'sy-{radius}-outline.svg').write_text(svg_str)
 
 
 def main():
     radius = 512
-    sy_shapes = build_sy_shapes(radius, show_turtle=True, show_turtle_intermediate_steps=False, enable_screen_capture=True)
+    sy_shapes = build_sy_shapes(radius, show_turtle=True, show_turtle_intermediate_steps=False, enable_screen_capture=False)
     generate_sy_png_outline(radius, sy_shapes)
     generate_sy_png_gif(radius, sy_shapes)
     generate_sy_svg(radius, sy_shapes)
