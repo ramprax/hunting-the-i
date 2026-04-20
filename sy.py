@@ -9,194 +9,11 @@ from concurrent.futures import ThreadPoolExecutor, wait
 
 from PIL import Image, ImageDraw, ImageChops
 
+from shapes import *
+from turtle_capture import TurtleCapture
+
 (OUTPUT_DIR := pathlib.Path('output')).mkdir(exist_ok=True)
 
-# Mathematical co-ord system:
-#  - right is +ve x
-#  - up is +ve y
-# (x, y) is a point
-# (point1, point2) is a line
-# (point1, point2, point3) is a triangle
-
-
-def mirror_left_right(point):
-    """
-    Get the reflection point when Y-Axis is the mirror; Left <=> Right
-    """
-    x, y = point
-    return -x, y
-
-def mirror_up_down(point):
-    """
-    Get the reflection point when X-Axis is the mirror; Up <=> Down
-    """
-    x, y = point
-    return x, -y
-
-def mirror_xy(point):
-    """
-    Get the reflection point when Y=X line is the mirror; Diagonal
-    """
-    x, y = point
-    return y, x
-
-
-def intersection_point(line1, line2):
-    print('Computing intersection for:', line1, line2)
-    ((ax1, ay1), (ax2, ay2)) = line1
-    ((bx1, by1), (bx2, by2)) = line2
-    
-    # Line 1: y=m1.x+c1
-    m1 = (ay2 - ay1)/(ax2 - ax1)
-    c1 = ay1 - ax1*m1
-
-    # Line 2: y=m2.x+c2
-    m2 = (by2 - by1)/(bx2 - bx1)
-    c2 = by1 - bx1*m2
-
-    # Intersection
-    x = (c2-c1)/(m1-m2)
-    y = m1*x + c1
-
-    return x, y
-
-import abc
-
-class Shape(abc.ABC):
-    @staticmethod
-    def to_image_coords(xy, image_centre_xy):
-        tx, ty = image_centre_xy
-        x, y = xy
-        return x + tx, ty - y
-
-    @abc.abstractmethod
-    def turtle_draw(self, tt: Turtle):
-        raise NotImplementedError()
-    
-    @abc.abstractmethod
-    def pil_draw(self, img_draw: ImageDraw, image_centre_xy, fill=None, outline=(255, 255, 255), width=1):
-        raise NotImplementedError()
-
-    @abc.abstractmethod
-    def svg_draw(self, element_id, image_centre_xy, fill, stroke):
-        raise NotImplementedError()
-
-class Circle(Shape):
-    def __init__(self, centre_xy, radius):
-        cx, cy = centre_xy
-        self._centre_xy = cx, cy
-        self._radius = radius
-    
-    @property
-    def radius(self):
-        return self._radius
-    
-    def turtle_draw(self, tt: Turtle):
-        if not tt:
-            return
-        cx, cy = self._centre_xy
-        tt.teleport(cx+self._radius, cy)
-        tt.setheading(90)
-        tt.circle(self._radius)
-    
-    def pil_draw(self, img_draw: ImageDraw, image_centre_xy, fill=None, outline=(255, 255, 255), width=1):
-        c_xy = super().to_image_coords(self._centre_xy, image_centre_xy)
-        img_draw.circle(xy = c_xy, radius=self._radius,
-                fill = fill,
-                outline = outline,
-                width = width)
-    
-    def svg_draw(self, element_id, image_centre_xy, fill, stroke):
-        c_xy = super().to_image_coords(self._centre_xy, image_centre_xy)
-        cx, cy = c_xy
-        return f'''<circle id="{element_id}" cx="{cx}" cy="{cy}" r="{math.ceil(self._radius)}" fill="{fill}" stroke="{stroke}"/>'''
-
-
-class Polygon(Shape):
-    def __init__(self, points):
-        self._points = [(x, y) for x, y in points]
-
-    def __len__(self):
-        return len(self._points)
-
-    def __getitem__(self, idx):
-        return self._points[idx]    
-
-    def turtle_draw(self, tt: Turtle):
-        if not tt:
-            return
-        ox, oy = self._points[0]
-        tt.teleport(ox, oy)
-        for x, y in self._points[1:]:
-            tt.goto(x, y)
-        tt.goto(ox, oy)
-
-    def pil_draw(self, img_draw: ImageDraw, image_centre_xy, fill=None, outline=(255, 255, 255), width=1):
-        if image_centre_xy:
-            image_coord_points = [super().to_image_coords(xy, image_centre_xy) for xy in self._points] 
-        else:
-            image_coord_points = self._points[:]
-        img_draw.polygon(image_coord_points, fill = fill, outline = outline, width=width)
-
-    def svg_draw(self, element_id, image_centre_xy, fill, stroke):
-        image_coord_points = [super().to_image_coords(xy, image_centre_xy) for xy in self._points] 
-        image_coord_points_str = ' '.join([','.join([str(v) for v in pt]) for pt in image_coord_points])
-        return f'''<polygon id="{element_id}" points="{image_coord_points_str}" fill="{fill}" stroke="{stroke}"/>'''
-
-
-class BezierCurve(Shape):
-    def __init__(self, guide_points):
-        self._guide_points = [(x, y) for x, y in guide_points]
-
-    @staticmethod
-    def calculate_bezier_curve_points(guide_points):
-        n = len(guide_points) - 1
-        coeffs = [math.comb(n, i) for i in range(n+1)]
-        curve_points = []
-        for tn in range(101):
-            t = tn/100
-            cx = 0
-            cy = 0
-            for i, (x, y) in enumerate(guide_points):
-                coeff = coeffs[i] * (t**i) * ((1-t)**(n-i))
-                cx += coeff * x
-                cy += coeff * y
-            curve_points.append((cx, cy))
-        return curve_points
-    
-    @property
-    def guide_points(self):
-        return self._guide_points[:]
-    
-    def curve_points(self, to_image_coords_ox_oy = None):
-        if to_image_coords_ox_oy is not None:
-            guide_points = [self.to_image_coords(pt, to_image_coords_ox_oy) for pt in self._guide_points]
-        else:
-            guide_points = self._guide_points
-        return self.calculate_bezier_curve_points(guide_points)
-
-    def turtle_draw(self, tt: Turtle):
-        if not tt:
-            return
-        curve_pts = self.curve_points()
-        ox, oy = curve_pts[0]
-        tt.teleport(ox, oy)
-        for x, y in curve_pts[1:]:
-            tt.goto(x, y)
-
-    def pil_draw(self, img_draw: ImageDraw, image_centre_xy, fill=None, outline=(255, 255, 255), width=1):
-        curve_points = self.curve_points(to_image_coords_ox_oy=image_centre_xy)
-        img_draw.line(curve_points, fill=fill, width=width)
-    
-    def svg_draw(self, element_id, image_centre_xy, fill, stroke):
-        if image_centre_xy:
-            guide_points = [to_image_coords(pt, image_centre_xy) for pt in self._guide_points]
-        else:
-            guide_points = self._guide_points
-        start_x, start_y = guide_points[0]
-        guide_points_str = ', '.join([' '.join(xy) for xy in guide_points[1:]])
-        svg_bezier_path_str = f'''<path id="{element_id}" d="M {start_x} {start_y} C {guide_points_str}" fill="{fill}" stroke="{stroke}"/>'''
-        return svg_bezier_path_str
 
 class Dalam(Shape):
     def __init__(self, n, base_radius, tip_radius):
@@ -491,9 +308,13 @@ def build_sy_shapes(outer_radius, show_turtle=False, show_turtle_intermediate_st
 
 
     origin_point = (0, 0)
-
+    
     circle_points_24 = [(round(radius * math.cos(i*math.pi/12), 6), round(radius * math.sin(i*math.pi/12), 6)) for i in range(24)]
 
+    sy_points = {
+        'circle_points_24': circle_points_24,
+    }
+    
     # outer_circle = Circle(origin_point, radius)
     # if show_turtle_intermediate_steps:
     #     # draw_circle(origin_point, radius)
@@ -545,6 +366,8 @@ def build_sy_shapes(outer_radius, show_turtle=False, show_turtle_intermediate_st
 
     up_triangle1 = Polygon((top_point,) + latitude_s_1)
     down_triangle1 = Polygon((bottom_point,) + latitude_n_1)
+    
+    sy_points['level_1'] = (top_point,) + latitude_s_1 + (bottom_point,) + latitude_n_1
 
     print("Top-S1 triangle:", up_triangle1)
     print("Bottom-N1 triangle:", down_triangle1)
@@ -630,6 +453,8 @@ def build_sy_shapes(outer_radius, show_turtle=False, show_turtle_intermediate_st
         up_triangle4_base_left_point,
         up_triangle4_base_right_point
     ))
+    
+    sy_points['level_1'] += (up_triangle4_base_left_point, up_triangle4_base_right_point)
 
     print('Upward triangle-4:', up_triangle4)
     if show_turtle_intermediate_steps:
@@ -654,6 +479,8 @@ def build_sy_shapes(outer_radius, show_turtle=False, show_turtle_intermediate_st
     up_triangle2_base_right_point = mirror_left_right(up_triangle2_base_left_point)
 
     up_triangle2 = Polygon((top_point_2, up_triangle2_base_left_point, up_triangle2_base_right_point))
+    
+    sy_points['level_1'] += (up_triangle2_base_left_point, up_triangle2_base_right_point)
 
     print('Upward triangle-2:', up_triangle2)
     if show_turtle_intermediate_steps:
@@ -693,6 +520,8 @@ def build_sy_shapes(outer_radius, show_turtle=False, show_turtle_intermediate_st
     if show_turtle_intermediate_steps:
         down_triangle5.turtle_draw(turtle)
         # draw_polygon(down_triangle5)
+    
+    sy_points['level_1'] += (down_triangle5_base_left_point, down_triangle5_base_right_point)
 
     up_tri1_left_line = up_triangle1[0], up_triangle1[1]
     top_pt3_lat_left_pt = intersection_point(down_triangle5_left_line, up_tri1_left_line)
@@ -704,6 +533,8 @@ def build_sy_shapes(outer_radius, show_turtle=False, show_turtle_intermediate_st
     down_triangle2_base_left_pt =  intersection_point(down_triangle2_left_line, top_pt3_lat)
     down_triangle2_base_right_pt = mirror_left_right(down_triangle2_base_left_pt)
     down_triangle2 = Polygon((bottom_point_2, down_triangle2_base_left_pt, down_triangle2_base_right_pt))
+    
+    sy_points['level_1'] += (down_triangle2_base_left_pt, down_triangle2_base_right_pt)
 
     print('Downward triangle-2:', down_triangle2)
     if show_turtle_intermediate_steps:
@@ -788,61 +619,39 @@ def build_sy_shapes(outer_radius, show_turtle=False, show_turtle_intermediate_st
         # draw_polygon(down_triangle4)
         # draw_circle(origin_point, radius/100)
 
-        should_capture = [enable_screen_capture]
-        capture_count = 0
-        capture_interval = 100
-        canvas = turtle.screen.getcanvas()
-
         xy_val = outer_radius+10
         wh_val = 2*outer_radius + 20
-        capture_x, capture_y, capture_width, capture_height = -xy_val, -xy_val, wh_val, wh_val
-        print(capture_x, capture_y, capture_width, capture_height)
-
-        tpe = ThreadPoolExecutor()
-        futures = []
-
-        def eps_to_png(eps_file, png_file):
-            print(f'Converting {eps_file} to png')
-            psimage = Image.open(eps_file)
-            print(f'{eps_file} WxH:', psimage.width, psimage.height)
-            # psimage.resize()
-            psimage.save(png_file) # or any other image format that PIL supports.
-            print(f'eps_to_png({eps_file}): Done')
-
-        def do_capture(capture_count):
-            ps_filename = OUTPUT_DIR / f'capture_{capture_count:04d}.eps'
-            # print(capture_x, capture_y, capture_width, capture_height)
-            canvas.postscript(file=str(ps_filename), x=capture_x, y=capture_y, width=capture_width, height=capture_height)
-            if should_capture[0]:
-                turtle.screen.ontimer(partial(do_capture, capture_count+1), t=capture_interval)
-            else:
-                for cc in range(capture_count+1):
-                    ps_filename = OUTPUT_DIR / f'capture_{cc:04d}.eps'
-                    png_filename = OUTPUT_DIR / f'capture_{cc:04d}.png'
-                    ft = tpe.submit(eps_to_png, ps_filename, png_filename)
-                    futures.append(ft)
-
-            print('capture_count:', capture_count)
+        
+        tt_cap = None
+        if enable_screen_capture:
+            capture_x, capture_y, capture_width, capture_height = -xy_val, -xy_val, wh_val, wh_val
+            print(capture_x, capture_y, capture_width, capture_height)
+            
+            tt_cap = TurtleCapture(
+                turtle, capture_interval=100, 
+                capture_x=capture_x, capture_y=capture_y,
+                capture_width=capture_width, capture_height=capture_height,
+                capture_filename_prefix='sy',
+                output_dir=OUTPUT_DIR
+            )
+            
 
         turtle.clear()
         turtle.teleport(0, 0)
-
-        if should_capture[0]:
-            turtle.screen.ontimer(partial(do_capture, capture_count), t=capture_interval)
-
-        def _stop_capture():
-            should_capture[0] = False
 
         def draw_final_shapes():
             turtle.clear()
             for s in final_shapes[:]:
                 s.turtle_draw(turtle)
+            
+            for level_name, level_points in sy_points.items():
+                for level_point in level_points:
+                    Circle(level_point, 5).turtle_draw(turtle, fill='black')
 
             turtle.teleport(0, 0)
-            turtle.screen.ontimer(_stop_capture, t=3000)
+            if tt_cap:
+                turtle.screen.ontimer(tt_cap.stop_capture, t=3000)
 
-        wait_time = 5
-        turtle.screen.ontimer(draw_final_shapes, t=wait_time*1000)
 
         def _show_count_down(seconds_left):
             turtle.clear()
@@ -850,16 +659,19 @@ def build_sy_shapes(outer_radius, show_turtle=False, show_turtle_intermediate_st
             if seconds_left > 1:
                 turtle.screen.ontimer(partial(_show_count_down, seconds_left-1), t=1000)
         
+        if tt_cap:
+            tt_cap.start()
+            
+        wait_time = 5
+        turtle.screen.ontimer(draw_final_shapes, t=wait_time*1000)
+
         turtle.screen.ontimer(partial(_show_count_down, wait_time-1))
 
         turtle.screen.mainloop()
-        wait(futures)
         
-        if enable_screen_capture:
-            print('Turtle captured PNG frames generated:', len(futures))
-            print('Use following command to generate video:')
-            print('''ffmpeg -framerate 24 -i "capture_%04d.png" -c:v libx264 -vf "pad=ceil(iw/2)*2:ceil(ih/2)*2" -pix_fmt yuv420p out.mp4''')
-
+        if tt_cap:
+            tt_cap.stop()
+        
     return final_shapes
 
 
@@ -993,9 +805,9 @@ def generate_sy_svg(radius, sy_shapes):
 def main():
     radius = 512
     sy_shapes = build_sy_shapes(radius, show_turtle=True, show_turtle_intermediate_steps=False, enable_screen_capture=False)
-    generate_sy_png_outline(radius, sy_shapes)
-    generate_sy_png_gif(radius, sy_shapes)
-    generate_sy_svg(radius, sy_shapes)
+    # generate_sy_png_outline(radius, sy_shapes)
+    # generate_sy_png_gif(radius, sy_shapes)
+    # generate_sy_svg(radius, sy_shapes)
 
 
 if __name__ == '__main__':
