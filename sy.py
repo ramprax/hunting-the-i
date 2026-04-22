@@ -15,7 +15,7 @@ from turtle_capture import TurtleCapture
 (OUTPUT_DIR := pathlib.Path('output')).mkdir(exist_ok=True)
 
 
-class Dalam(Shape):
+class Dalam(Shape, CanDo3D):
     def __init__(self, n, base_radius, tip_radius):
         self._n = n
         self._base_radius = base_radius
@@ -90,10 +90,10 @@ class Dalam(Shape):
             dalam_curve_points += bz.curve_points()
         return dalam_curve_points
 
-    def turtle_draw(self, tt: Turtle):
+    def turtle_draw(self, tt: Turtle, fill=None, outline=None):
         if not tt:
             return
-        Polygon(self.curve_points()).turtle_draw(tt)
+        Polygon(self.curve_points()).turtle_draw(tt, fill=fill, outline=outline)
     
     def pil_draw(self, img_draw: ImageDraw, image_centre_xy, fill=None, outline=(255, 255, 255), width=1):
         c_pts = self.curve_points(image_centre_xy)
@@ -119,6 +119,9 @@ class Dalam(Shape):
 
         svg_dalam_path_str = f'''<path id="{element_id}" d="{path_instruction_str}" fill="{fill}" stroke="{stroke}"/>'''
         return svg_dalam_path_str
+    
+    def get_2D_points(self):
+        return tuple(self.curve_points())
 
 
 def sy_bhupura_shapes(radius, turtle, show_turtle=True, show_intermediate_steps=True):
@@ -311,10 +314,60 @@ def build_sy_shapes(outer_radius, show_turtle=False, show_turtle_intermediate_st
     
     circle_points_24 = [(round(radius * math.cos(i*math.pi/12), 6), round(radius * math.sin(i*math.pi/12), 6)) for i in range(24)]
 
-    sy_points = {
-        'circle_points_24': circle_points_24,
+    sy_all_points = list()  # OrderedDict()
+    sy_level_points = {
+        'level_0': [],  # tuple(circle_points_24),
+        'level_1': [],  # tuple(),
+        'level_2': [],  # tuple(),
+        'level_3': [],  # tuple(),
+        'level_4': [],  # tuple(),
+        'level_5': [],  # tuple(),
+        'level_6': [],  # tuple(),
+        'level_7': [],  # tuple(),
+        'level_8': [],  # tuple(),
+        'level_9': [],  # tuple(),
     }
     
+    def _add_sy_point(point, level):
+        x, y = point
+        _x, _y = float(x), float(y)
+        if point not in sy_all_points:
+            sy_all_points.append(point)
+        pt_idx = sy_all_points.index(point)
+        lps = sy_level_points[level]
+        if pt_idx not in lps:
+            lps.append(pt_idx)
+    
+    def _add_all_sy_points(points, level):
+        for pt in points:
+            _add_sy_point(pt, level)
+    
+    def _get_point_angle(point):
+        x, y = point
+        if y == 0:
+            if x >= 0:  # Right +ve x-axis
+                return 0
+            return math.pi  # Left -ve x-axis
+        if x == 0:
+            if y > 0:  # Up +ve y-axis
+                return math.pi/2
+            return 3*math.pi/2 # Down -ve y-axis
+        angle = math.atan(abs(y/x))
+
+        if x > 0 and y < 0:  # 4th quadrant
+            return 2*math.pi - angle
+        if x < 0 and y > 0:  # 2nd quadrant
+            return math.pi - angle
+        if x < 0 and y < 0:  # 3rd quadrant
+            return math.pi + angle        
+
+        return angle  # 1st quandrant
+
+    def _sort_point_indices_by_direction(point_idx_list):
+        point_idx_list.sort(key=lambda pt_idx: _get_point_angle(sy_all_points[pt_idx]))
+        
+    _add_all_sy_points(circle_points_24[:], 'level_0')
+
     # outer_circle = Circle(origin_point, radius)
     # if show_turtle_intermediate_steps:
     #     # draw_circle(origin_point, radius)
@@ -367,7 +420,8 @@ def build_sy_shapes(outer_radius, show_turtle=False, show_turtle_intermediate_st
     up_triangle1 = Polygon((top_point,) + latitude_s_1)
     down_triangle1 = Polygon((bottom_point,) + latitude_n_1)
     
-    sy_points['level_1'] = (top_point,) + latitude_s_1 + (bottom_point,) + latitude_n_1
+    # sy_points['level_1'] = (top_point,) + latitude_s_1 + (bottom_point,) + latitude_n_1
+    _add_all_sy_points(((top_point,) + latitude_s_1 + (bottom_point,) + latitude_n_1), 'level_1')
 
     print("Top-S1 triangle:", up_triangle1)
     print("Bottom-N1 triangle:", down_triangle1)
@@ -398,6 +452,12 @@ def build_sy_shapes(outer_radius, show_turtle=False, show_turtle_intermediate_st
     print('Upward triangle-2 Part Left Intersection point:', up_tri2_part_left_intx_point)
     print('Upward triangle-2 Part Right Intersection point2:', up_tri2_part_right_intx_point)
 
+    # sy_points['level_1'] += (up_tri2_part_left_intx_point, up_tri2_part_right_intx_point)
+    _add_all_sy_points((up_tri2_part_left_intx_point, up_tri2_part_right_intx_point), 'level_1')
+    
+    # sy_points['level_3'] += (up_tri2_part_left_intx_point, up_tri2_part_right_intx_point)
+    _add_all_sy_points((up_tri2_part_left_intx_point, up_tri2_part_right_intx_point), 'level_3')
+
     up_triangle2_left_line = (top_point_2, up_tri2_part_left_intx_point)
     up_triangle2_right_line = (top_point_2, up_tri2_part_right_intx_point)
 
@@ -424,6 +484,12 @@ def build_sy_shapes(outer_radius, show_turtle=False, show_turtle_intermediate_st
     if show_turtle_intermediate_steps:
         draw_line(down_triangle2_left_line)
         draw_line(down_triangle2_right_line)
+    
+    # sy_points['level_1'] += (bottom_tri2_left_intx_point, bottom_tri2_right_intx_point)
+    _add_all_sy_points((bottom_tri2_left_intx_point, bottom_tri2_right_intx_point), 'level_1')
+    
+    # sy_points['level_3'] += (bottom_tri2_left_intx_point, bottom_tri2_right_intx_point)
+    _add_all_sy_points((bottom_tri2_left_intx_point, bottom_tri2_right_intx_point), 'level_3')
 
     top_point_4 = up_triangle4_top_point = lat_n1_midpoint
     up_triangle4_part_base_left_point = intersection_point(down_triangle2_left_line, latitude_s_1)
@@ -454,7 +520,14 @@ def build_sy_shapes(outer_radius, show_turtle=False, show_turtle_intermediate_st
         up_triangle4_base_right_point
     ))
     
-    sy_points['level_1'] += (up_triangle4_base_left_point, up_triangle4_base_right_point)
+    # sy_points['level_1'] += (up_triangle4_base_left_point, up_triangle4_base_right_point)
+    _add_all_sy_points((up_triangle4_base_left_point, up_triangle4_base_right_point), 'level_1')
+    
+    # sy_points['level_3'] += (up_triangle4_part[1], up_triangle4_part[2])
+    _add_all_sy_points((up_triangle4_part[1], up_triangle4_part[2]), 'level_3')
+    
+    # sy_points['level_5'] += (up_triangle4_part[1], up_triangle4_part[2])
+    _add_all_sy_points((up_triangle4_part[1], up_triangle4_part[2]), 'level_5')
 
     print('Upward triangle-4:', up_triangle4)
     if show_turtle_intermediate_steps:
@@ -480,7 +553,15 @@ def build_sy_shapes(outer_radius, show_turtle=False, show_turtle_intermediate_st
 
     up_triangle2 = Polygon((top_point_2, up_triangle2_base_left_point, up_triangle2_base_right_point))
     
-    sy_points['level_1'] += (up_triangle2_base_left_point, up_triangle2_base_right_point)
+    # sy_points['level_1'] += (up_triangle2_base_left_point, up_triangle2_base_right_point)
+    _add_all_sy_points((up_triangle2_base_left_point, up_triangle2_base_right_point), 'level_1')
+
+    # sy_points['level_1'] += (up_triangle2_base_left_intx_pt1, up_triangle2_base_right_intx_pt1)
+    _add_all_sy_points((up_triangle2_base_left_intx_pt1, up_triangle2_base_right_intx_pt1), 'level_1')
+
+    # sy_points['level_3'] += (up_triangle2_base_left_intx_pt1, up_triangle2_base_right_intx_pt1)
+    _add_all_sy_points((up_triangle2_base_left_intx_pt1, up_triangle2_base_right_intx_pt1), 'level_3')
+
 
     print('Upward triangle-2:', up_triangle2)
     if show_turtle_intermediate_steps:
@@ -521,7 +602,13 @@ def build_sy_shapes(outer_radius, show_turtle=False, show_turtle_intermediate_st
         down_triangle5.turtle_draw(turtle)
         # draw_polygon(down_triangle5)
     
-    sy_points['level_1'] += (down_triangle5_base_left_point, down_triangle5_base_right_point)
+    # sy_points['level_1'] += (down_triangle5_base_left_point, down_triangle5_base_right_point)
+    _add_all_sy_points((down_triangle5_base_left_point, down_triangle5_base_right_point), 'level_1')
+
+    # sy_points['level_3'] += (trapezium_top_left_pt, trapezium_top_right_pt)
+    _add_all_sy_points((trapezium_top_left_pt, trapezium_top_right_pt), 'level_3')
+    # sy_points['level_5'] += (trapezium_top_left_pt, trapezium_top_right_pt)
+    _add_all_sy_points((trapezium_top_left_pt, trapezium_top_right_pt), 'level_5')
 
     up_tri1_left_line = up_triangle1[0], up_triangle1[1]
     top_pt3_lat_left_pt = intersection_point(down_triangle5_left_line, up_tri1_left_line)
@@ -534,7 +621,13 @@ def build_sy_shapes(outer_radius, show_turtle=False, show_turtle_intermediate_st
     down_triangle2_base_right_pt = mirror_left_right(down_triangle2_base_left_pt)
     down_triangle2 = Polygon((bottom_point_2, down_triangle2_base_left_pt, down_triangle2_base_right_pt))
     
-    sy_points['level_1'] += (down_triangle2_base_left_pt, down_triangle2_base_right_pt)
+    # sy_points['level_1'] += (down_triangle2_base_left_pt, down_triangle2_base_right_pt)
+    _add_all_sy_points((down_triangle2_base_left_pt, down_triangle2_base_right_pt), 'level_1')
+    
+    # sy_points['level_1'] += (top_pt3_lat_left_pt, top_pt3_lat_right_pt)
+    _add_all_sy_points((top_pt3_lat_left_pt, top_pt3_lat_right_pt), 'level_1')
+    # sy_points['level_3'] += (top_pt3_lat_left_pt, top_pt3_lat_right_pt)
+    _add_all_sy_points((top_pt3_lat_left_pt, top_pt3_lat_right_pt), 'level_3')
 
     print('Downward triangle-2:', down_triangle2)
     if show_turtle_intermediate_steps:
@@ -592,15 +685,186 @@ def build_sy_shapes(outer_radius, show_turtle=False, show_turtle_intermediate_st
         centre_circle.turtle_draw(turtle)
         # draw_circle(origin_point, radius/100)
     
-    final_shapes = bhupura_no_dalams + (
-        dalam_circle1, shodasha_dalam,
-        dalam_circle2, ashta_dalam,
-        dalam_circle3,
+    equator_left_intx_pt = intersection_point(up_tri1_left_line, down_tri1_left_line)
+    equator_left_intx_pt = (equator_left_intx_pt[0], 0)
+    equator_right_intx_pt = mirror_left_right(equator_left_intx_pt)
+    
+    top_2_lat_left_intx_pt = intersection_point(top_point_2_latitude, up_tri1_left_line)
+    top_2_lat_right_intx_pt = mirror_left_right(top_2_lat_left_intx_pt)
+    
+    bottom_2_lat_left_intx_pt = intersection_point(bottom_point_2_latitude, down_tri1_left_line)
+    bottom_2_lat_right_intx_pt = mirror_left_right(bottom_2_lat_left_intx_pt)
+    
+    _add_all_sy_points(
+        [
+            equator_left_intx_pt,
+            equator_right_intx_pt,
+            top_2_lat_left_intx_pt,
+            top_2_lat_right_intx_pt,
+            bottom_2_lat_left_intx_pt,
+            bottom_2_lat_right_intx_pt,
+        ],
+        'level_1'
+    )
+
+    _add_all_sy_points(
+        [
+            equator_left_intx_pt,
+            equator_right_intx_pt,
+            top_2_lat_left_intx_pt,
+            top_2_lat_right_intx_pt,
+            bottom_2_lat_left_intx_pt,
+            bottom_2_lat_right_intx_pt,
+        ],
+        'level_2'
+    )
+    
+    equator_left_2_intx_pt = intersection_point(
+        up_triangle2_left_line, down_triangle2_left_line)
+    equator_left_2_intx_pt = (equator_left_2_intx_pt[0], 0)
+    equator_right_2_intx_pt = mirror_left_right(equator_left_2_intx_pt)
+    
+    _add_all_sy_points(
+        [equator_left_2_intx_pt, equator_right_2_intx_pt],
+        'level_3'
+    )
+    _add_all_sy_points(
+        [equator_left_2_intx_pt, equator_right_2_intx_pt],
+        'level_4'
+    )
+    
+    _add_all_sy_points(
+        (top_point_2, bottom_point_2),
+        'level_3'
+    )
+    
+    _add_all_sy_points(
+        (top_point3, bottom_point_3, up_tri3_base_left_pt, up_tri3_base_right_pt, down_tri3_base_line_left_pt,
+        down_tri3_base_line_right_pt),
+        'level_5'
+    )
+    
+    _add_all_sy_points(
+        (top_point_4, bottom_point_4),
+        'level_7'
+    )
+    
+    _add_sy_point(bottom_point_5, 'level_9')
+
+    top_lat_3_left_3_intx_pt = intersection_point(top_pt3_lat, up_triangle2_left_line)
+    top_lat_3_left_3_intx_pt = (top_lat_3_left_3_intx_pt[0], top_point3[1])
+    top_lat_3_right_3_intx_pt = mirror_left_right(top_lat_3_left_3_intx_pt)
+    
+    _add_all_sy_points(
+        [top_lat_3_left_3_intx_pt, top_lat_3_right_3_intx_pt],
+        'level_3'
+    )
+    _add_all_sy_points(
+        [top_lat_3_left_3_intx_pt, top_lat_3_right_3_intx_pt],
+        'level_4'
+    )
+    
+    bot_lat_3_left_3_intx_pt = intersection_point(up_triangle2_base_line_part, down_triangle2_left_line)
+    bot_lat_3_left_3_intx_pt = (bot_lat_3_left_3_intx_pt[0], bottom_point_3[1])
+    bot_lat_3_right_3_intx_pt = mirror_left_right(bot_lat_3_left_3_intx_pt)
+    
+    _add_all_sy_points(
+        [bot_lat_3_left_3_intx_pt, bot_lat_3_right_3_intx_pt],
+        'level_3'
+    )
+    _add_all_sy_points(
+        [bot_lat_3_left_3_intx_pt, bot_lat_3_right_3_intx_pt],
+        'level_4'
+    )
+    
+    left_intx = intersection_point(up_tri3_left_line, latitude_n_1)
+    left_intx = (left_intx[0], lat_n1_midpoint[1])
+    right_intx = mirror_left_right(left_intx)
+    _add_all_sy_points([left_intx, right_intx], 'level_5')
+    _add_all_sy_points([left_intx, right_intx], 'level_6')
+    
+    down_tri3_left_line = (down_tri3_base_line_left_pt, bottom_point_3)
+    left_intx = intersection_point(down_tri3_left_line, latitude_s_1)
+    left_intx = left_intx[0], lat_s1_midpoint[1]
+    right_intx = mirror_left_right(left_intx)
+    _add_all_sy_points([left_intx, right_intx], 'level_5')
+    _add_all_sy_points([left_intx, right_intx], 'level_6')
+    
+    left_intx = intersection_point(up_tri3_left_line, down_tri3_left_line)
+    right_intx = mirror_left_right(left_intx)
+    _add_all_sy_points([left_intx, right_intx], 'level_5')
+    _add_all_sy_points([left_intx, right_intx], 'level_6')
+    
+    _add_all_sy_points(
+        [down_tri3_base_line_part_left_pt, down_tri3_base_line_part_right_pt],
+        'level_5'
+    )
+    _add_all_sy_points(
+        [down_tri3_base_line_part_left_pt, down_tri3_base_line_part_right_pt],
+        'level_7'
+    )
+    
+    up_tri3_base_line = (up_tri3_base_left_pt, up_tri3_base_right_pt)
+    left_intx = intersection_point(up_tri3_base_line, up_triangle4_left_line)
+    right_intx = mirror_left_right(left_intx)
+    _add_all_sy_points([left_intx, right_intx], 'level_5')
+    _add_all_sy_points([left_intx, right_intx], 'level_7')
+    
+    
+    _add_all_sy_points((down_tri4_base_line_left_pt, down_tri4_base_line_right_pt), 'level_7')
+    
+    _add_all_sy_points(
+        (down_tri4_base_line_part_left_pt, down_tri4_base_line_part_right_pt),
+        'level_7')
+    _add_all_sy_points(
+        (down_tri4_base_line_part_left_pt, down_tri4_base_line_part_right_pt),
+        'level_9')
+        
+    left_intx = intersection_point(down_tri3_base_line_part, up_triangle4_left_line)
+    right_intx = mirror_left_right(left_intx)
+    _add_all_sy_points([left_intx, right_intx], 'level_7')
+    _add_all_sy_points([left_intx, right_intx], 'level_8')
+    
+    down_tri4_left_line = (down_tri4_base_line_left_pt, bottom_point_4)
+    left_intx = intersection_point(up_triangle4_left_line, down_tri4_left_line)
+    right_intx = mirror_left_right(left_intx)
+    _add_all_sy_points([left_intx, right_intx], 'level_7')
+    _add_all_sy_points([left_intx, right_intx], 'level_8')
+
+    left_intx = intersection_point(up_tri3_base_line, down_tri4_left_line)
+    right_intx = mirror_left_right(left_intx)
+    _add_all_sy_points([left_intx, right_intx], 'level_7')
+    _add_all_sy_points([left_intx, right_intx], 'level_8')
+    
+    final_level_wise_polygons = []
+    for level_name, level_point_indices in sy_level_points.items():
+        _sort_point_indices_by_direction(level_point_indices)
+        if level_name != 'level_0':
+            p = Polygon([sy_all_points[lpidx] for lpidx in level_point_indices])
+            final_level_wise_polygons.append(p)
+    
+    final_level_wise_polygons = tuple(final_level_wise_polygons)
+    
+    final_intersecting_triangles = (
         up_triangle1, down_triangle1, up_triangle4,
         up_triangle2, down_triangle5, down_triangle2,
         up_triangle3, down_triangle3, down_triangle4,
-        centre_circle
     )
+    
+    # final_shapes_all = bhupura_no_dalams + (
+    #     dalam_circle1, shodasha_dalam,
+    #     dalam_circle2, ashta_dalam,
+    #     dalam_circle3,) + final_intersecting_triangles + (centre_circle,)
+    
+    final_shapes_all = bhupura_no_dalams + (
+        dalam_circle1, shodasha_dalam,
+        dalam_circle2, ashta_dalam,
+        dalam_circle3,) + final_level_wise_polygons + (centre_circle,)
+
+    final_shapes_quick = final_level_wise_polygons  # final_intersecting_triangles
+    
+    final_shapes = final_shapes_all  # final_shapes_quick
+
 
     if turtle:
         if show_turtle_intermediate_steps:
@@ -641,12 +905,16 @@ def build_sy_shapes(outer_radius, show_turtle=False, show_turtle_intermediate_st
 
         def draw_final_shapes():
             turtle.clear()
+            # turtle.speed(0)
             for s in final_shapes[:]:
                 s.turtle_draw(turtle)
-            
-            for level_name, level_points in sy_points.items():
-                for level_point in level_points:
-                    Circle(level_point, 5).turtle_draw(turtle, fill='black')
+                
+            # level_fill = 'white'
+            print('sy_all_points size:', len(sy_all_points))
+            # for p in final_level_wise_polygons:
+            #    level_fill = 'white' if level_fill == 'black' else 'black'
+            #     p.turtle_draw(turtle, fill=level_fill)
+            print('sy_all_points size:', len(sy_all_points))
 
             turtle.teleport(0, 0)
             if tt_cap:
@@ -803,11 +1071,25 @@ def generate_sy_svg(radius, sy_shapes):
 
 
 def main():
-    radius = 512
-    sy_shapes = build_sy_shapes(radius, show_turtle=True, show_turtle_intermediate_steps=False, enable_screen_capture=False)
+    radius = 600
+    sy_shapes = build_sy_shapes(radius, show_turtle=False, show_turtle_intermediate_steps=False, enable_screen_capture=False)
     # generate_sy_png_outline(radius, sy_shapes)
-    # generate_sy_png_gif(radius, sy_shapes)
+    print(sy_shapes)
+    generate_sy_png_gif(radius, sy_shapes)
     # generate_sy_svg(radius, sy_shapes)
+    
+    num_levels = len(sy_shapes)
+    level_height = radius/num_levels
+    point_store, faces = convert_all_shapes_2d_to_xz3d(sy_shapes[:], level_height, start_y=-500)
+    
+    print("3D Point Store:", point_store)
+    print("3D Faces:", faces)
+
+    print("Total 3D Points in store:", len(point_store))
+    print("Total 3D Faces:", len(faces))
+    
+    json_string = generate_vs_fs_js(point_store, faces, 1000)
+    pathlib.Path(OUTPUT_DIR / f'sy-3D-{radius}-vs-fs.js').write_text(json_string)
 
 
 if __name__ == '__main__':

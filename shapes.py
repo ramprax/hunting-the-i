@@ -3,6 +3,8 @@ import abc
 import math
 from turtle import Turtle
 
+import json
+
 from PIL import ImageDraw
 
 
@@ -75,6 +77,88 @@ class Shape(abc.ABC):
     def svg_draw(self, element_id, image_centre_xy, fill, stroke):
         raise NotImplementedError()
 
+
+class CanDo3D(abc.ABC):
+    
+    @abc.abstractmethod
+    def get_2D_points():
+        raise NotImplementedError()
+
+
+def make_point3d_store():
+    return []
+
+    
+def get_or_add_3d_point_store_index(point3D, point3d_store):
+    x, y, z = point3D
+    x = float(x)
+    y = float(y)
+    z = float(z)
+    point3D = x, y, z
+    if point3D not in point3d_store:
+        point3d_store.append(point3D)
+    return point3d_store.index(point3D)
+
+
+def convert_2d_shape_to_xz3d_faces(shape: CanDo3D, bottom_y, top_y, point3d_store):
+    shape_2D_points = shape.get_2D_points()
+    
+    point_3d_idx_bottom_list = []
+    point_3d_idx_top_list = []
+    
+    faces = []
+    
+    for point2D in shape_2D_points:
+        x2, y2 = point2D
+        x3, y3, z3 = x2, bottom_y, y2
+        
+        bottom_point_3d_idx = get_or_add_3d_point_store_index((x3, y3, z3), point3d_store)
+        point_3d_idx_bottom_list.append(bottom_point_3d_idx)
+        
+        x3, y3, z3 = x2, top_y, y2
+        top_point_3d_idx = get_or_add_3d_point_store_index((x3, y3, z3), point3d_store)
+        point_3d_idx_top_list.append(top_point_3d_idx)
+    
+    faces.append(point_3d_idx_bottom_list)
+    faces.append(point_3d_idx_top_list)
+    for i, bottom_pt_idx in enumerate(point_3d_idx_bottom_list):
+        if i < len(point_3d_idx_bottom_list)-1:
+            faces.append([
+                bottom_pt_idx, point_3d_idx_bottom_list[i+1],
+                point_3d_idx_top_list[i+1], point_3d_idx_top_list[i]
+            ])
+            
+    return faces
+
+
+def convert_all_shapes_2d_to_xz3d(shapes: list[CanDo3D], level_height, start_y=0):
+    point_3d_store = make_point3d_store()
+    all_shape_faces = []
+    for i, shape in enumerate(shapes):
+        bottom_y = start_y + i * level_height
+        top_y = bottom_y + level_height
+        faces = convert_2d_shape_to_xz3d_faces(shape, bottom_y, top_y, point_3d_store)
+        all_shape_faces.extend(faces)
+    
+    return point_3d_store, all_shape_faces
+
+JS_PROG_STRING = '''
+const vs = {vs};
+
+const fs = {fs};
+
+'''
+
+def generate_vs_fs_js(point_3d_store, faces, scale_down_factor=1.0):
+    vs = [{'x': x/scale_down_factor, 'y': y/scale_down_factor, 'z': z/scale_down_factor} for x, y, z in point_3d_store]
+    fs = faces[:]
+
+    js_string = JS_PROG_STRING.format(vs=json.dumps(vs), fs=json.dumps(fs))
+    js_string = js_string.replace('"x"', "x").replace('"y"', "y").replace('"z"', "z")
+
+    return js_string
+    
+
 class Text(Shape):
     def __init__(self, txt, xy, font=None, h_align=None, v_align=None, color=None):
         x, y = xy
@@ -85,7 +169,7 @@ class Text(Shape):
         self._v_align = v_align
         self._color = color
 
-    def turtle_draw(self, tt: Turtle, fill=None):
+    def turtle_draw(self, tt: Turtle, fill=None, outline=None):
         x, y = self._xy
         if not self._v_align or self._v_align == 'top':
             tt.teleport(x, y)
@@ -115,7 +199,7 @@ class Text(Shape):
         raise NotImplementedError()
     
 
-class Circle(Shape):
+class Circle(Shape, CanDo3D):
     def __init__(self, centre_xy, radius):
         cx, cy = centre_xy
         self._centre_xy = cx, cy
@@ -125,12 +209,16 @@ class Circle(Shape):
     def radius(self):
         return self._radius
     
-    def turtle_draw(self, tt: Turtle, fill=None):
+    def turtle_draw(self, tt: Turtle, fill=None, outline=None):
         if not tt:
             return
         cx, cy = self._centre_xy
         tt.teleport(cx+self._radius, cy)
         tt.setheading(90)
+        
+        if outline:
+            tt.pencolor(outline)
+
         if fill:
             tt.fillcolor(fill)
             tt.begin_fill()
@@ -151,9 +239,19 @@ class Circle(Shape):
         c_xy = super().to_image_coords(self._centre_xy, image_centre_xy)
         cx, cy = c_xy
         return f'''<circle id="{element_id}" cx="{cx}" cy="{cy}" r="{math.ceil(self._radius)}" fill="{fill}" stroke="{stroke}"/>'''
+    
+    def get_2D_points(self):
+        cx, cy = self._centre_xy
+        circle_points_48 = tuple([
+            (
+                self._radius * math.cos(i*math.pi/12) + cx,
+                self._radius * math.sin(i*math.pi/12) + cy
+            ) for i in range(48)
+        ])
+        return circle_points_48
 
 
-class Polygon(Shape):
+class Polygon(Shape, CanDo3D):
     def __init__(self, points):
         self._points = [(x, y) for x, y in points]
 
@@ -163,11 +261,13 @@ class Polygon(Shape):
     def __getitem__(self, idx):
         return self._points[idx]    
 
-    def turtle_draw(self, tt: Turtle, fill=None):
+    def turtle_draw(self, tt: Turtle, fill=None, outline=None):
         if not tt:
             return
         ox, oy = self._points[0]
         tt.teleport(ox, oy)
+        if outline:
+            tt.pencolor(outline)
         if fill:
             tt.fillcolor(fill)
             tt.begin_fill()
@@ -191,14 +291,18 @@ class Polygon(Shape):
         image_coord_points_str = ' '.join([','.join([str(v) for v in pt]) for pt in image_coord_points])
         return f'''<polygon id="{element_id}" points="{image_coord_points_str}" fill="{fill}" stroke="{stroke}"/>'''
 
+    def get_2D_points(self):
+        return tuple(self._points[:])
+
 
 class BezierCurve(Shape):
-    def __init__(self, guide_points, resolution=100):
+    DEFAULT_RESOLUTION = 10
+    def __init__(self, guide_points, resolution=DEFAULT_RESOLUTION):
         self._guide_points = [(x, y) for x, y in guide_points]
-        self._resolution = int(resolution) if resolution else 100
+        self._resolution = int(resolution) if resolution else DEFAULT_RESOLUTION
 
     @staticmethod
-    def calculate_bezier_curve_points(guide_points, resolution=100):
+    def calculate_bezier_curve_points(guide_points, resolution=DEFAULT_RESOLUTION):
         n = len(guide_points) - 1
         coeffs = [math.comb(n, i) for i in range(n+1)]
         curve_points = []
@@ -224,13 +328,16 @@ class BezierCurve(Shape):
             guide_points = self._guide_points
         return self.calculate_bezier_curve_points(guide_points, self._resolution)
 
-    def turtle_draw(self, tt: Turtle, fill=None):
+    def turtle_draw(self, tt: Turtle, fill=None, outline=None):
         if not tt:
             return
         curve_pts = self.curve_points()
         ox, oy = curve_pts[0]
         end_x, end_y = curve_pts[-1]
         tt.teleport(ox, oy)
+        
+        if outline:
+            tt.pencolor(outline)
         
         if fill and ox == end_x and oy == end_y:
             tt.fillcolor(fill)
