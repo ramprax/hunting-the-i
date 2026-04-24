@@ -15,44 +15,46 @@ from turtle_capture import TurtleCapture
 (OUTPUT_DIR := pathlib.Path('output')).mkdir(exist_ok=True)
 
 
-class Dalam(Shape, CanDo3D):
-    def __init__(self, n, base_radius, tip_radius):
+class Dalam(Shape, CenteredShape):
+    def __init__(self, n, base_radius, tip_radius,centre_xy=(0, 0)):
         self._n = n
         self._base_radius = base_radius
         self._tip_radius = tip_radius
+        self._centre_xy = centre_xy
 
     def _make_dalam_guide_points(self):
+        cx, cy = self._centre_xy
         angle_incr = 2*math.pi/self._n
         half_angle_incr = math.pi/self._n
         dalam_tips_x = [
-            self._tip_radius*math.cos(i*angle_incr) for i in range(self._n)
+            (cx + self._tip_radius*math.cos(i*angle_incr)) for i in range(self._n)
         ]
         dalam_tips_y = [
-            self._tip_radius*math.sin(i*angle_incr) for i in range(self._n)
+            (cy + self._tip_radius*math.sin(i*angle_incr)) for i in range(self._n)
         ]
         dalam_tips = list(zip(dalam_tips_x, dalam_tips_y))
 
         dalam_bases_x = [
-            self._base_radius*math.cos(half_angle_incr + i*angle_incr) for i in range(self._n)
+            (cx + self._base_radius*math.cos(half_angle_incr + i*angle_incr)) for i in range(self._n)
         ]
         dalam_bases_y = [
-            self._base_radius*math.sin(half_angle_incr + i*angle_incr) for i in range(self._n)
+            (cy + self._base_radius*math.sin(half_angle_incr + i*angle_incr)) for i in range(self._n)
         ]
         dalam_bases = list(zip(dalam_bases_x, dalam_bases_y))
 
         dalam_intp1_x = [
-            self._base_radius*math.cos(i*angle_incr) for i in range(self._n)
+            (cx + self._base_radius*math.cos(i*angle_incr)) for i in range(self._n)
         ]
         dalam_intp1_y = [
-            self._base_radius*math.sin(i*angle_incr) for i in range(self._n)
+            (cy + self._base_radius*math.sin(i*angle_incr)) for i in range(self._n)
         ]
         dalam_intp1 = list(zip(dalam_intp1_x, dalam_intp1_y))
 
         dalam_intp2_x = [
-            self._tip_radius*math.cos(half_angle_incr + i*angle_incr) for i in range(self._n)
+            (cx + self._tip_radius*math.cos(half_angle_incr + i*angle_incr)) for i in range(self._n)
         ]
         dalam_intp2_y = [
-            self._tip_radius*math.sin(half_angle_incr + i*angle_incr) for i in range(self._n)
+            (cy + self._tip_radius*math.sin(half_angle_incr + i*angle_incr)) for i in range(self._n)
         ]
         dalam_intp2 = list(zip(dalam_intp2_x, dalam_intp2_y))
 
@@ -123,6 +125,138 @@ class Dalam(Shape, CanDo3D):
     def get_2D_points(self):
         return tuple(self.curve_points())
 
+SIN_COS_45 = 1/(2**.5)
+
+
+class BhupuraBoundaryPolygon(Polygon, CanDo3D):
+
+    def __init__(self, containing_circle_radius, boundary_level=0):
+        radius = float(containing_circle_radius)
+        assert 0 <= boundary_level <= 2
+        boundary_level = int(boundary_level)
+
+        square_pts = (
+            (radius * SIN_COS_45, radius * SIN_COS_45),
+            (-radius * SIN_COS_45, radius * SIN_COS_45),
+            (-radius * SIN_COS_45, -radius * SIN_COS_45),
+            (radius * SIN_COS_45, -radius * SIN_COS_45),
+        )
+
+        sq_side = 2 * radius * SIN_COS_45
+        sin_t = SIN_COS_45 / 2  # (sq_side/4)/radius = 1/2**1.5
+        cos_t = (7 ** .5) * SIN_COS_45/ 2  # sqrt(1-(sin_t)^2) = (7**.5)/2**1.5
+
+        right_rectangle_points = (
+            (radius * cos_t, radius * sin_t),
+            (sq_side / 2, radius * sin_t),
+            (sq_side / 2, -radius * sin_t),
+            (radius * cos_t, -radius * sin_t),
+        )
+
+        top_rectangle_points = tuple(
+            mirror_xy(xy) for xy in right_rectangle_points
+        )
+
+        left_rectangle_points = tuple(
+            mirror_left_right(xy) for xy in right_rectangle_points
+        )
+
+        bottom_rectangle_points = tuple(
+            mirror_up_down(xy) for xy in top_rectangle_points
+        )
+
+        right_neck_x = radius * cos_t - sq_side / 8
+        right_neck_y = sq_side / 8
+
+        # boundary thickness
+        bt_full = right_neck_x - sq_side / 2
+        bt_half = bt_full / 2
+
+        bt = bt_half * boundary_level
+
+        boundary_1_8th = (
+            (radius * cos_t - bt, 0),
+            (radius * cos_t - bt, sq_side / 4 - bt),
+            (right_neck_x + bt, sq_side / 4 - bt),
+            (right_neck_x + bt, right_neck_y - bt),
+            (sq_side / 2 - bt, right_neck_y - bt),
+            (sq_side / 2 - bt, sq_side / 2 - bt),
+        )
+
+        polygon = full_polygon_from_1_8th(boundary_1_8th)
+
+        # Remove repeats
+        poly_points = polygon._points[:]
+        points = [pt for i, pt in enumerate(poly_points) if ((i == 0) or (poly_points[i-1] != pt))]
+
+        super().__init__(points)
+
+    def get_3D_triangles(self, bottom_y, level_height, point_3d_store):
+        points_all = self.get_2D_points()
+        triangles_2D = []
+
+        if points_all[0] == points_all[-1]:
+            points_all = points_all[:-1]
+        print('Num bhupura polygon points:', len(points_all))
+
+        # For outer-rectangles and necks on 4 sides
+        for i in range(4):
+            points = points_all[(i*10):]+points_all[((i-1)*10):(i*10)]
+
+            outer_rect_points = points[0:4] + points[-3:]
+            outer_rect_minimal = outer_rect_points[1:3] + outer_rect_points[-2:]
+            assert len(outer_rect_minimal) == 4
+
+            triangles_2D += [
+                outer_rect_minimal[:3],
+                outer_rect_minimal[2:4] + outer_rect_minimal[:1]
+            ]
+
+            neck_rect_points = points[3:5] + points[-4:-2]
+            assert len(neck_rect_points) == 4
+
+            triangles_2D += [
+                neck_rect_points[:3],
+                neck_rect_points[2:4] + neck_rect_points[:1]
+            ]
+
+        # Big inner rectangle
+        big_inner_rect = [points_all[5], points_all[15], points_all[25], points_all[35]]
+        triangles_2D += [
+            big_inner_rect[:3],
+            big_inner_rect[2:4] + big_inner_rect[:1]
+        ]
+
+        top_y = bottom_y + level_height
+        triangles_3D = []
+        for t2d in triangles_2D:
+            bottom_t3d = [(x, bottom_y, y) for x, y in reversed(t2d)]
+            triangles_3D.append(bottom_t3d)
+
+            top_t3d = [(x, top_y, y) for x, y in t2d]
+            triangles_3D.append(top_t3d)
+
+        # Side triangles
+        top_points_3d = [(x, top_y, y) for x, y in points_all]
+        bottom_points_3d = [(x, bottom_y, y) for x, y in points_all]
+
+        sz = len(bottom_points_3d)
+        for i, bottom_pt in enumerate(bottom_points_3d):
+            top_pt = top_points_3d[i]
+            next_bottom_pt = bottom_points_3d[(i+1)%sz]
+            next_top_pt = top_points_3d[(i+1)%sz]
+            upper_triangle = [bottom_pt, next_top_pt, top_pt]
+            lower_triangle = [bottom_pt, next_bottom_pt, next_top_pt]
+            triangles_3D.append(upper_triangle)
+            triangles_3D.append(lower_triangle)
+
+        triangle_3d_indexed = [
+            [get_or_add_3d_point_store_index(pt, point_3d_store) for pt in tri3d]
+            for tri3d in triangles_3D
+        ]
+
+        return triangle_3d_indexed
+
 
 def sy_bhupura_shapes(radius, turtle, show_turtle=True, show_intermediate_steps=True):
 
@@ -139,7 +273,7 @@ def sy_bhupura_shapes(radius, turtle, show_turtle=True, show_intermediate_steps=
         (-radius*sin_cos_45, -radius*sin_cos_45),
         (radius*sin_cos_45, -radius*sin_cos_45),
     )
-    
+
     sq = Polygon(square_pts)
     if show_intermediate_steps:
         sq.turtle_draw(turtle)
@@ -190,7 +324,8 @@ def sy_bhupura_shapes(radius, turtle, show_turtle=True, show_intermediate_steps=
         (sq_side/2, right_neck_y),
         (sq_side/2, sq_side/2),
     )
-    boundary_polygon = full_polygon_from_1_8th(one_eigth_polygon)
+    # boundary_polygon = full_polygon_from_1_8th(one_eigth_polygon)
+    boundary_polygon = BhupuraBoundaryPolygon(radius, 0)
     if show_intermediate_steps:
         boundary_polygon.turtle_draw(turtle)
 
@@ -205,7 +340,8 @@ def sy_bhupura_shapes(radius, turtle, show_turtle=True, show_intermediate_steps=
         (sq_side/2 - bt_half, right_neck_y - bt_half),
         (sq_side/2 - bt_half, sq_side/2 - bt_half),
     )
-    middle_boundary_polygon = full_polygon_from_1_8th(middle_boundary_1_8th)
+    # middle_boundary_polygon = full_polygon_from_1_8th(middle_boundary_1_8th)
+    middle_boundary_polygon = BhupuraBoundaryPolygon(radius, 1)
     if show_intermediate_steps:
         middle_boundary_polygon.turtle_draw(turtle)
 
@@ -217,7 +353,8 @@ def sy_bhupura_shapes(radius, turtle, show_turtle=True, show_intermediate_steps=
         (sq_side/2 - bt, right_neck_y - bt),
         (sq_side/2 - bt, sq_side/2 - bt),
     )
-    inner_boundary_polygon = full_polygon_from_1_8th(inner_boundary_1_8th)
+    # inner_boundary_polygon = full_polygon_from_1_8th(inner_boundary_1_8th)
+    inner_boundary_polygon = BhupuraBoundaryPolygon(radius, 2)
     if show_intermediate_steps:
         inner_boundary_polygon.turtle_draw(turtle)
 
@@ -342,29 +479,9 @@ def build_sy_shapes(outer_radius, show_turtle=False, show_turtle_intermediate_st
         for pt in points:
             _add_sy_point(pt, level)
     
-    def _get_point_angle(point):
-        x, y = point
-        if y == 0:
-            if x >= 0:  # Right +ve x-axis
-                return 0
-            return math.pi  # Left -ve x-axis
-        if x == 0:
-            if y > 0:  # Up +ve y-axis
-                return math.pi/2
-            return 3*math.pi/2 # Down -ve y-axis
-        angle = math.atan(abs(y/x))
-
-        if x > 0 and y < 0:  # 4th quadrant
-            return 2*math.pi - angle
-        if x < 0 and y > 0:  # 2nd quadrant
-            return math.pi - angle
-        if x < 0 and y < 0:  # 3rd quadrant
-            return math.pi + angle        
-
-        return angle  # 1st quandrant
 
     def _sort_point_indices_by_direction(point_idx_list):
-        point_idx_list.sort(key=lambda pt_idx: _get_point_angle(sy_all_points[pt_idx]))
+        point_idx_list.sort(key=lambda pt_idx: get_point_angle(sy_all_points[pt_idx]))
         
     _add_all_sy_points(circle_points_24[:], 'level_0')
 
@@ -840,7 +957,7 @@ def build_sy_shapes(outer_radius, show_turtle=False, show_turtle_intermediate_st
     for level_name, level_point_indices in sy_level_points.items():
         _sort_point_indices_by_direction(level_point_indices)
         if level_name != 'level_0':
-            p = Polygon([sy_all_points[lpidx] for lpidx in level_point_indices])
+            p = CenteredPolygon([sy_all_points[lpidx] for lpidx in level_point_indices])
             final_level_wise_polygons.append(p)
     
     final_level_wise_polygons = tuple(final_level_wise_polygons)
@@ -1080,16 +1197,33 @@ def main():
     
     num_levels = len(sy_shapes)
     level_height = radius/num_levels
-    point_store, faces = convert_all_shapes_2d_to_xz3d(sy_shapes[:], level_height, start_y=-500)
+    point_store, faces = convert_all_shapes_2d_to_xz3d(sy_shapes[:], level_height, start_y=-150)
     
-    print("3D Point Store:", point_store)
-    print("3D Faces:", faces)
+    # print("3D Point Store:", point_store)
+    # print("3D Faces:", faces)
 
     print("Total 3D Points in store:", len(point_store))
     print("Total 3D Faces:", len(faces))
+    print("Levels:", num_levels)
+    print("Level height:", level_height)
     
     json_string = generate_vs_fs_js(point_store, faces, 1000)
     pathlib.Path(OUTPUT_DIR / f'sy-3D-{radius}-vs-fs.js').write_text(json_string)
+
+    # Try triangles
+    triangulating_shapes = sy_shapes[:]
+    triangle_point_store, triangle_faces = convert_all_shapes_to_3d_triangles(triangulating_shapes, level_height, start_y=-150)
+    # print("3D Triangle Point Store:", triangle_point_store)
+    # print("3D Triangle Faces:", triangle_faces)
+
+    print("Total 3D Triangle Points in store:", len(triangle_point_store))
+    print("Total 3D Triangle Faces:", len(triangle_faces))
+    print("Levels:", num_levels)
+    print("Level height:", level_height)
+
+    json_string = generate_vs_fs_js(triangle_point_store, triangle_faces, 1000)
+    pathlib.Path(OUTPUT_DIR / f'sy-3D-triangles-{radius}-vs-fs.js').write_text(json_string)
+
 
 
 if __name__ == '__main__':
