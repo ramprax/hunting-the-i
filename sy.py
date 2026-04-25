@@ -9,6 +9,7 @@ from concurrent.futures import ThreadPoolExecutor, wait
 
 from PIL import Image, ImageDraw, ImageChops
 
+from gltf_helper import make_gltf, save_gltf_to_file
 from shapes import *
 from turtle_capture import TurtleCapture
 
@@ -185,13 +186,14 @@ class BhupuraBoundaryPolygon(Polygon, CanDo3D):
 
         polygon = full_polygon_from_1_8th(boundary_1_8th)
 
-        # Remove repeats
+        # Remove consecutive repeats
         poly_points = polygon._points[:]
         points = [pt for i, pt in enumerate(poly_points) if ((i == 0) or (poly_points[i-1] != pt))]
 
         super().__init__(points)
 
-    def get_3D_triangles(self, bottom_y, level_height, point_3d_store):
+    def get_3D_triangles(self, bottom_y, level_height, point_3d_store, xyz_handedness='RIGHT'):
+        func_2d_to_3d = point_xy_2d_to_point_xz_3d[xyz_handedness]
         points_all = self.get_2D_points()
         triangles_2D = []
 
@@ -230,15 +232,15 @@ class BhupuraBoundaryPolygon(Polygon, CanDo3D):
         top_y = bottom_y + level_height
         triangles_3D = []
         for t2d in triangles_2D:
-            bottom_t3d = [(x, bottom_y, y) for x, y in reversed(t2d)]
+            bottom_t3d = [func_2d_to_3d(pt2d, bottom_y) for pt2d in reversed(t2d)]
             triangles_3D.append(bottom_t3d)
 
-            top_t3d = [(x, top_y, y) for x, y in t2d]
+            top_t3d = [func_2d_to_3d(pt2d, top_y) for pt2d in t2d]
             triangles_3D.append(top_t3d)
 
         # Side triangles
-        top_points_3d = [(x, top_y, y) for x, y in points_all]
-        bottom_points_3d = [(x, bottom_y, y) for x, y in points_all]
+        top_points_3d = [func_2d_to_3d(pt2d, top_y) for pt2d in points_all]
+        bottom_points_3d = [func_2d_to_3d(pt2d, bottom_y) for pt2d in points_all]
 
         sz = len(bottom_points_3d)
         for i, bottom_pt in enumerate(bottom_points_3d):
@@ -1197,7 +1199,7 @@ def main():
     
     num_levels = len(sy_shapes)
     level_height = radius/num_levels
-    point_store, faces = convert_all_shapes_2d_to_xz3d(sy_shapes[:], level_height, start_y=-150)
+    point_store, faces = convert_all_shapes_2d_to_xz3d_faces(sy_shapes[:], level_height, start_y=-150)
     
     # print("3D Point Store:", point_store)
     # print("3D Faces:", faces)
@@ -1224,6 +1226,10 @@ def main():
     json_string = generate_vs_fs_js(triangle_point_store, triangle_faces, 1000)
     pathlib.Path(OUTPUT_DIR / f'sy-3D-triangles-{radius}-vs-fs.js').write_text(json_string)
 
+    gltf_file_path = OUTPUT_DIR / f'sy-3D-triangles-{radius}.gltf'
+    gltf = make_gltf(triangle_point_store, triangle_faces, scale_down_factor=1000)
+    print(gltf)
+    save_gltf_to_file(gltf, gltf_file_path)
 
 
 if __name__ == '__main__':

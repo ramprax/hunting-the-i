@@ -85,13 +85,15 @@ class CanDo3D(abc.ABC):
     def get_2D_points(self):
         raise NotImplementedError()
 
-    def get_3D_triangles(self, bottom_y, level_height, point_3d_store):
+    def get_3D_triangles(self, bottom_y, level_height, point_3d_store, xyz_handedness='RIGHT'):
         raise NotImplementedError()
 
 
 class CenteredShape(CanDo3D, ABC):
-    def get_3D_triangles(self, bottom_y, level_height, point_3d_store):
+    def get_3D_triangles(self, bottom_y, level_height, point_3d_store, xyz_handedness='RIGHT'):
         points_2d = self.get_2D_points()
+
+        func_2d_to_3d = point_xy_2d_to_point_xz_3d[xyz_handedness]
 
         if len(points_2d) < 3:
             raise NotImplementedError('Not implemented: Less than 3 points')
@@ -101,77 +103,104 @@ class CenteredShape(CanDo3D, ABC):
         triangles = []
 
         if len(points_2d) == 3:
-            (x1, y1), (x2, y2), (x3, y3) = points_2d
+            p1, p2, p3 = points_2d
 
-            tp1 = (x1, top_y, y1)
-            tp1_idx = get_or_add_3d_point_store_index(tp1, point_3d_store)
-            tp2 = (x2, top_y, y2)
-            tp2_idx = get_or_add_3d_point_store_index(tp2, point_3d_store)
-            tp3 = (x3, top_y, y3)
-            tp3_idx = get_or_add_3d_point_store_index(tp3, point_3d_store)
+            tp1 = func_2d_to_3d(p1, top_y)
+            tp2 = func_2d_to_3d(p2, top_y)
+            tp3 = func_2d_to_3d(p3, top_y)
 
-            bp1 = (x1, bottom_y, y1)
-            bp1_idx = get_or_add_3d_point_store_index(bp1, point_3d_store)
-            bp2 = (x2, bottom_y, y2)
-            bp2_idx = get_or_add_3d_point_store_index(bp2, point_3d_store)
-            bp3 = (x3, bottom_y, y3)
-            bp3_idx = get_or_add_3d_point_store_index(bp3, point_3d_store)
+            bp1 = func_2d_to_3d(p1, bottom_y)
+            bp2 = func_2d_to_3d(p2, bottom_y)
+            bp3 = func_2d_to_3d(p3, bottom_y)
 
-            triangles.append([tp1_idx, tp2_idx, tp3_idx])
-            triangles.append([bp3_idx, bp2_idx, bp1_idx])
+            triangles.append([tp1, tp2, tp3])
+            triangles.append([bp3, bp2, bp1])
 
-            triangles.append([bp1_idx, tp2_idx, tp1_idx])
-            triangles.append([bp1_idx, bp2_idx, tp2_idx])
+            triangles.append([bp1, tp2, tp1])
+            triangles.append([bp1, bp2, tp2])
 
-            triangles.append([bp2_idx, tp3_idx, tp2_idx])
-            triangles.append([bp2_idx, bp3_idx, tp3_idx])
+            triangles.append([bp2, tp3, tp2])
+            triangles.append([bp2, bp3, tp3])
 
-            triangles.append([bp3_idx, tp1_idx, tp3_idx])
-            triangles.append([bp3_idx, bp1_idx, tp1_idx])
+            triangles.append([bp3, tp1, tp3])
+            triangles.append([bp3, bp1, tp1])
 
-            return triangles
+            triangle_3d_indexed = [
+                [get_or_add_3d_point_store_index(pt, point_3d_store) for pt in tri3d]
+                for tri3d in triangles
+            ]
+
+            return triangle_3d_indexed
 
         num_points = len(points_2d)
-        cx3d, cz3d = self._centre_xy
-        bottom_center_xyz = cx3d, bottom_y, cz3d
-        bottom_center_idx = get_or_add_3d_point_store_index(bottom_center_xyz, point_3d_store)
+        # cx3d, cz3d = self._centre_xy
+        bottom_center_xyz = func_2d_to_3d(self._centre_xy, bottom_y)
+        # bottom_center_idx = get_or_add_3d_point_store_index(bottom_center_xyz, point_3d_store)
 
-        top_center_xyz = cx3d, top_y, cz3d
-        top_center_idx = get_or_add_3d_point_store_index(top_center_xyz, point_3d_store)
+        top_center_xyz = func_2d_to_3d(self._centre_xy, top_y) # cx3d, top_y, cz3d
+        # top_center_idx = get_or_add_3d_point_store_index(top_center_xyz, point_3d_store)
 
         for i, point in enumerate(points_2d):
             point_x, point_y = point
-            next_point_x, next_point_y = points_2d[(i+1)%num_points]
+            next_point_x, next_point_y = next_point = points_2d[(i+1)%num_points]
 
             # Bottom
-            bottom_point_3d = point_x, bottom_y, point_y
-            cur_bottom_point_idx = get_or_add_3d_point_store_index(bottom_point_3d, point_3d_store)
+            cur_bottom_point_3d = func_2d_to_3d(point, bottom_y)
+            # cur_bottom_point_idx = get_or_add_3d_point_store_index(bottom_point_3d, point_3d_store)
 
-            next_bottom_point_3d = next_point_x, bottom_y, next_point_y
-            next_bottom_point_idx = get_or_add_3d_point_store_index(next_bottom_point_3d, point_3d_store)
+            next_bottom_point_3d = func_2d_to_3d(next_point, bottom_y)  # next_point_x, bottom_y, next_point_y
+            # next_bottom_point_idx = get_or_add_3d_point_store_index(next_bottom_point_3d, point_3d_store)
 
-            bottom_triangle = [bottom_center_idx, next_bottom_point_idx, cur_bottom_point_idx]
+            bottom_triangle = [bottom_center_xyz, next_bottom_point_3d, cur_bottom_point_3d]
             triangles.append(bottom_triangle)
 
             # Top
-            top_point_3d = point_x, top_y, point_y
-            cur_top_point_idx = get_or_add_3d_point_store_index(top_point_3d, point_3d_store)
+            cur_top_point_3d = func_2d_to_3d(point, top_y)
+            # cur_top_point_idx = get_or_add_3d_point_store_index(top_point_3d, point_3d_store)
 
-            next_top_point_3d = next_point_x, top_y, next_point_y
-            next_top_point_idx = get_or_add_3d_point_store_index(next_top_point_3d, point_3d_store)
+            next_top_point_3d = func_2d_to_3d(next_point, top_y)
+            # next_top_point_idx = get_or_add_3d_point_store_index(next_top_point_3d, point_3d_store)
 
-            top_triangle = [top_center_idx, cur_top_point_idx, next_top_point_idx]
+            top_triangle = [top_center_xyz, cur_top_point_3d, next_top_point_3d]
             triangles.append(top_triangle)
 
             # Side
-            side_upper_triangle = [cur_bottom_point_idx, next_top_point_idx, cur_top_point_idx]
-            side_lower_triangle = [cur_bottom_point_idx, next_bottom_point_idx, next_top_point_idx]
+            side_upper_triangle = [cur_bottom_point_3d, next_top_point_3d, cur_top_point_3d]
+            side_lower_triangle = [cur_bottom_point_3d, next_bottom_point_3d, next_top_point_3d]
 
             triangles.append(side_upper_triangle)
             triangles.append(side_lower_triangle)
 
-        return triangles
+        triangle_3d_indexed = [
+            [get_or_add_3d_point_store_index(pt, point_3d_store) for pt in tri3d]
+            for tri3d in triangles
+        ]
 
+        return triangle_3d_indexed
+
+
+def point_xy_2d_to_point_xz_3d_right_handed(point_xy, y_3d):
+    x_2d, y_2d = point_xy
+    x_2d = float(x_2d)
+    y_2d = float(y_2d)
+    x_3d = x_2d
+    z_3d = -y_2d  # Right handed co-ordinate system
+    return x_3d, float(y_3d), z_3d
+
+
+def point_xy_2d_to_point_xz_3d_left_handed(point_xy, y_3d):
+    x_2d, y_2d = point_xy
+    x_2d = float(x_2d)
+    y_2d = float(y_2d)
+    x_3d = x_2d
+    z_3d = y_2d  # Left handed co-ordinate system
+    return x_3d, float(y_3d), z_3d
+
+
+point_xy_2d_to_point_xz_3d = {
+    'RIGHT': point_xy_2d_to_point_xz_3d_right_handed,
+    'LEFT': point_xy_2d_to_point_xz_3d_left_handed,
+}
 
 
 def make_point3d_store():
@@ -189,62 +218,64 @@ def get_or_add_3d_point_store_index(point3D, point3d_store):
     return point3d_store.index(point3D)
 
 
-def convert_2d_shape_to_xz3d_faces(shape: CanDo3D, bottom_y, top_y, point3d_store):
+def convert_2d_shape_to_xz3d_faces(shape: CanDo3D, bottom_y, top_y, point3d_store, xyz_handedness='RIGHT'):
+    func_2d_to_3d = point_xy_2d_to_point_xz_3d[xyz_handedness]
     shape_2D_points = shape.get_2D_points()
     
-    point_3d_idx_bottom_list = []
-    point_3d_idx_top_list = []
+    point_3d_bottom_list = []
+    point_3d_top_list = []
     
     faces = []
     
     for point2D in shape_2D_points:
-        x2, y2 = point2D
-        x3, y3, z3 = x2, bottom_y, y2
+        bottom_point_3d = func_2d_to_3d(point2D, bottom_y)
+        point_3d_bottom_list.append(bottom_point_3d)
         
-        bottom_point_3d_idx = get_or_add_3d_point_store_index((x3, y3, z3), point3d_store)
-        point_3d_idx_bottom_list.append(bottom_point_3d_idx)
-        
-        x3, y3, z3 = x2, top_y, y2
-        top_point_3d_idx = get_or_add_3d_point_store_index((x3, y3, z3), point3d_store)
-        point_3d_idx_top_list.append(top_point_3d_idx)
+        top_point_3d = func_2d_to_3d(point2D, top_y)
+        point_3d_top_list.append(top_point_3d)
     
-    faces.append(point_3d_idx_bottom_list)
-    faces.append(point_3d_idx_top_list)
-    for i, bottom_pt_idx in enumerate(point_3d_idx_bottom_list):
-        if i < len(point_3d_idx_bottom_list)-1:
+    faces.append(point_3d_bottom_list)
+    faces.append(point_3d_top_list)
+    for i, bottom_pt in enumerate(point_3d_bottom_list):
+        if i < len(point_3d_bottom_list)-1:
             faces.append([
-                bottom_pt_idx, point_3d_idx_bottom_list[i+1],
-                point_3d_idx_top_list[i+1], point_3d_idx_top_list[i]
+                bottom_pt, point_3d_bottom_list[i+1],
+                point_3d_top_list[i+1], point_3d_top_list[i]
             ])
-            
-    return faces
+    faces_indexed = [
+        [get_or_add_3d_point_store_index(pt, point3d_store) for pt in face]
+        for face in faces
+    ]
+
+    return faces_indexed
 
 
-def convert_all_shapes_2d_to_xz3d(shapes: list[CanDo3D], level_height, start_y=0):
+def convert_all_shapes_2d_to_xz3d_faces(shapes: list[CanDo3D], level_height, start_y=0, xyz_handedness='LEFT'):
     point_3d_store = make_point3d_store()
     all_shape_faces = []
     for i, shape in enumerate(shapes):
         bottom_y = start_y + i * level_height
         top_y = bottom_y + level_height
-        faces = convert_2d_shape_to_xz3d_faces(shape, bottom_y, top_y, point_3d_store)
+        faces = convert_2d_shape_to_xz3d_faces(shape, bottom_y, top_y, point_3d_store, xyz_handedness=xyz_handedness)
         all_shape_faces.extend(faces)
     
     return point_3d_store, all_shape_faces
 
-def convert_all_shapes_to_3d_triangles(shapes: list[CanDo3D], level_height, start_y=0):
+
+def convert_all_shapes_to_3d_triangles(shapes: list[CanDo3D], level_height, start_y=0, xyz_handedness='RIGHT'):
     point_3d_store = make_point3d_store()
-    all_shape_faces = []
+    all_shape_triangles = []
     for i, shape in enumerate(shapes):
         bottom_y = start_y + i * level_height
         top_y = bottom_y + level_height
         try:
-            faces = shape.get_3D_triangles(bottom_y, level_height, point_3d_store)
-            all_shape_faces.extend(faces)
+            faces = shape.get_3D_triangles(bottom_y, level_height, point_3d_store, xyz_handedness=xyz_handedness)
+            all_shape_triangles.extend(faces)
         except NotImplementedError as nie:
             print(f'Could not triangulate: shapes[{i}] <{type(shape)}>')
             # faces = convert_2d_shape_to_xz3d_faces(shape, bottom_y, top_y, point_3d_store)
 
-    return point_3d_store, all_shape_faces
+    return point_3d_store, all_shape_triangles
 
 
 JS_PROG_STRING = '''
