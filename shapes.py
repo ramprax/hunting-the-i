@@ -78,105 +78,122 @@ class Shape(abc.ABC):
     def svg_draw(self, element_id, image_centre_xy, fill, stroke):
         raise NotImplementedError()
 
-
-class CanDo3D(abc.ABC):
-    
     @abc.abstractmethod
     def get_2D_points(self):
         raise NotImplementedError()
 
-    def get_3D_triangles(self, bottom_y, level_height, point_3d_store, xyz_handedness='RIGHT'):
+
+class Face3D(Shape, abc.ABC):
+    def get_3D_faces(self, bottom_y, level_height, xyz_handedness='RIGHT'):
+        func_2d_to_3d = point_xy_2d_to_point_xz_3d[xyz_handedness]
+        points_2d = self.get_2D_points()
+
+        top_y = bottom_y + level_height
+        top_points = [func_2d_to_3d(pt2d, top_y) for pt2d in points_2d[:]]
+        bottom_points = [func_2d_to_3d(pt2d, bottom_y) for pt2d in points_2d[:]]
+
+        top_face = top_points[:]
+        bottom_face = reversed(bottom_points)
+
+        faces_3d = [top_face, bottom_face]
+
+        for i, cur_bottom_pt in enumerate(reversed(bottom_points)):
+            next_bottom_pt = bottom_points[(i+1)%len(bottom_points)]
+            top_pt = top_points[i]
+            next_top_pt = top_points[(i+1)%len(bottom_points)]
+            faces_3d.append([
+                cur_bottom_pt, next_bottom_pt,
+                next_top_pt, top_pt
+            ])
+
+        return faces_3d
+
+    def get_3D_faces_indexed(self, point_3d_store, bottom_y, level_height, xyz_handedness='RIGHT'):
+        faces_3d = self.get_3D_faces(bottom_y, level_height, xyz_handedness)
+
+        faces_indexed = [
+            [get_or_add_3d_point_store_index(pt, point_3d_store) for pt in face]
+            for face in faces_3d
+        ]
+
+        return faces_indexed
+
+
+class Triangulate2D(Shape, abc.ABC):
+    @abc.abstractmethod
+    def get_2D_triangles(self):
         raise NotImplementedError()
 
 
-class CenteredShape(CanDo3D, ABC):
-    def get_3D_triangles(self, bottom_y, level_height, point_3d_store, xyz_handedness='RIGHT'):
-        points_2d = self.get_2D_points()
-
+class Triangulate3D(Triangulate2D, abc.ABC):
+    
+    def get_3D_triangles(self, bottom_y, level_height, xyz_handedness='RIGHT'):
         func_2d_to_3d = point_xy_2d_to_point_xz_3d[xyz_handedness]
 
-        if len(points_2d) < 3:
-            raise NotImplementedError('Not implemented: Less than 3 points')
+        points_2d = self.get_2D_points()
+        triangles_2d = self.get_2D_triangles()
 
         top_y = bottom_y + level_height
 
-        triangles = []
-
-        if len(points_2d) == 3:
-            p1, p2, p3 = points_2d
-
-            tp1 = func_2d_to_3d(p1, top_y)
-            tp2 = func_2d_to_3d(p2, top_y)
-            tp3 = func_2d_to_3d(p3, top_y)
-
-            bp1 = func_2d_to_3d(p1, bottom_y)
-            bp2 = func_2d_to_3d(p2, bottom_y)
-            bp3 = func_2d_to_3d(p3, bottom_y)
-
-            triangles.append([tp1, tp2, tp3])
-            triangles.append([bp3, bp2, bp1])
-
-            triangles.append([bp1, tp2, tp1])
-            triangles.append([bp1, bp2, tp2])
-
-            triangles.append([bp2, tp3, tp2])
-            triangles.append([bp2, bp3, tp3])
-
-            triangles.append([bp3, tp1, tp3])
-            triangles.append([bp3, bp1, tp1])
-
-            triangle_3d_indexed = [
-                [get_or_add_3d_point_store_index(pt, point_3d_store) for pt in tri3d]
-                for tri3d in triangles
-            ]
-
-            return triangle_3d_indexed
+        triangles_3d = []
+        for tri2d in triangles_2d:
+            top_tri3d = [func_2d_to_3d(pt2d, top_y) for pt2d in tri2d]
+            bottom_tri3d = [func_2d_to_3d(pt2d, bottom_y) for pt2d in reversed(tri2d)]
+            triangles_3d.append(top_tri3d)
+            triangles_3d.append(bottom_tri3d)
 
         num_points = len(points_2d)
-        # cx3d, cz3d = self._centre_xy
-        bottom_center_xyz = func_2d_to_3d(self._centre_xy, bottom_y)
-        # bottom_center_idx = get_or_add_3d_point_store_index(bottom_center_xyz, point_3d_store)
 
-        top_center_xyz = func_2d_to_3d(self._centre_xy, top_y) # cx3d, top_y, cz3d
-        # top_center_idx = get_or_add_3d_point_store_index(top_center_xyz, point_3d_store)
+        for i, cur_point in enumerate(points_2d):
+            next_point = points_2d[(i+1)%num_points]
 
-        for i, point in enumerate(points_2d):
-            point_x, point_y = point
-            next_point_x, next_point_y = next_point = points_2d[(i+1)%num_points]
-
-            # Bottom
-            cur_bottom_point_3d = func_2d_to_3d(point, bottom_y)
-            # cur_bottom_point_idx = get_or_add_3d_point_store_index(bottom_point_3d, point_3d_store)
-
-            next_bottom_point_3d = func_2d_to_3d(next_point, bottom_y)  # next_point_x, bottom_y, next_point_y
-            # next_bottom_point_idx = get_or_add_3d_point_store_index(next_bottom_point_3d, point_3d_store)
-
-            bottom_triangle = [bottom_center_xyz, next_bottom_point_3d, cur_bottom_point_3d]
-            triangles.append(bottom_triangle)
-
-            # Top
-            cur_top_point_3d = func_2d_to_3d(point, top_y)
-            # cur_top_point_idx = get_or_add_3d_point_store_index(top_point_3d, point_3d_store)
+            cur_top_point_3d = func_2d_to_3d(cur_point, top_y)
+            cur_bottom_point_3d = func_2d_to_3d(cur_point, bottom_y)
 
             next_top_point_3d = func_2d_to_3d(next_point, top_y)
-            # next_top_point_idx = get_or_add_3d_point_store_index(next_top_point_3d, point_3d_store)
-
-            top_triangle = [top_center_xyz, cur_top_point_3d, next_top_point_3d]
-            triangles.append(top_triangle)
+            next_bottom_point_3d = func_2d_to_3d(next_point, bottom_y)  # next_point_x, bottom_y, next_point_y
 
             # Side
             side_upper_triangle = [cur_bottom_point_3d, next_top_point_3d, cur_top_point_3d]
             side_lower_triangle = [cur_bottom_point_3d, next_bottom_point_3d, next_top_point_3d]
 
-            triangles.append(side_upper_triangle)
-            triangles.append(side_lower_triangle)
+            triangles_3d.append(side_upper_triangle)
+            triangles_3d.append(side_lower_triangle)
 
-        triangle_3d_indexed = [
-            [get_or_add_3d_point_store_index(pt, point_3d_store) for pt in tri3d]
-            for tri3d in triangles
+        return triangles_3d
+
+    def get_3D_triangles_indexed(self, point_3d_store, bottom_y, level_height, xyz_handedness='RIGHT'):
+        triangles_3d = self.get_3D_triangles(bottom_y, level_height, xyz_handedness)
+        triangles_3d_indexed = [
+            [get_or_add_3d_point_store_index(point3d, point_3d_store) for point3d in tri3d]
+            for tri3d in triangles_3d
         ]
+        return triangles_3d_indexed
 
-        return triangle_3d_indexed
+
+class CenteredShape(Triangulate3D, Face3D, abc.ABC):
+    def get_2D_triangles(self):
+        print(f'{self.__class__}.get_2D_triangles()')
+        points_2d = self.get_2D_points()
+
+        num_points = len(points_2d)
+
+        if num_points < 3:
+            return []
+
+        if num_points == 3:
+            print('Returning:', points_2d[:])
+            return [points_2d[:]]  # 3 points already a triangle
+
+        triangles_2d = []
+        centre_point = self._centre_xy
+        for i, cur_point in enumerate(points_2d):
+            next_point = points_2d[(i+1)%num_points]
+
+            triangle_2d = [centre_point, cur_point, next_point]
+            triangles_2d.append(triangle_2d)
+
+        return triangles_2d
 
 
 def point_xy_2d_to_point_xz_3d_right_handed(point_xy, y_3d):
@@ -218,7 +235,7 @@ def get_or_add_3d_point_store_index(point3D, point3d_store):
     return point3d_store.index(point3D)
 
 
-def convert_2d_shape_to_xz3d_faces(shape: CanDo3D, bottom_y, top_y, point3d_store, xyz_handedness='RIGHT'):
+def convert_2d_shape_to_xz3d_faces(shape: Triangulate3D, bottom_y, top_y, point3d_store, xyz_handedness='RIGHT'):
     func_2d_to_3d = point_xy_2d_to_point_xz_3d[xyz_handedness]
     shape_2D_points = shape.get_2D_points()
     
@@ -250,7 +267,7 @@ def convert_2d_shape_to_xz3d_faces(shape: CanDo3D, bottom_y, top_y, point3d_stor
     return faces_indexed
 
 
-def convert_all_shapes_2d_to_xz3d_faces(shapes: list[CanDo3D], level_height, start_y=0, xyz_handedness='LEFT'):
+def convert_all_shapes_2d_to_xz3d_faces(shapes: list[Triangulate3D], level_height, start_y=0, xyz_handedness='LEFT'):
     point_3d_store = make_point3d_store()
     all_shape_faces = []
     for i, shape in enumerate(shapes):
@@ -262,14 +279,14 @@ def convert_all_shapes_2d_to_xz3d_faces(shapes: list[CanDo3D], level_height, sta
     return point_3d_store, all_shape_faces
 
 
-def convert_all_shapes_to_3d_triangles(shapes: list[CanDo3D], level_height, start_y=0, xyz_handedness='RIGHT'):
+def convert_all_shapes_to_3d_triangles(shapes: list[Triangulate3D], level_height, start_y=0, xyz_handedness='RIGHT'):
     point_3d_store = make_point3d_store()
     all_shape_triangles = []
     for i, shape in enumerate(shapes):
         bottom_y = start_y + i * level_height
         top_y = bottom_y + level_height
         try:
-            faces = shape.get_3D_triangles(bottom_y, level_height, point_3d_store, xyz_handedness=xyz_handedness)
+            faces = shape.get_3D_triangles_indexed(point_3d_store, bottom_y, level_height, xyz_handedness=xyz_handedness)
             all_shape_triangles.extend(faces)
         except NotImplementedError as nie:
             print(f'Could not triangulate: shapes[{i}] <{type(shape)}>')
@@ -333,9 +350,94 @@ class Text(Shape):
 
     def svg_draw(self, element_id, image_centre_xy, fill, stroke):
         raise NotImplementedError()
-    
 
-class Circle(Shape, CenteredShape):
+
+class Polygon(Face3D):
+    def __init__(self, points):
+        self._points = [(x, y) for x, y in points]
+
+    def __len__(self):
+        return len(self._points)
+
+    def __getitem__(self, idx):
+        return self._points[idx]
+
+    def turtle_draw(self, tt: Turtle, fill=None, outline=None):
+        if not tt:
+            return
+        ox, oy = self._points[0]
+        tt.teleport(ox, oy)
+        if outline:
+            tt.pencolor(outline)
+        if fill:
+            tt.fillcolor(fill)
+            tt.begin_fill()
+
+        for x, y in self._points[1:]:
+            tt.goto(x, y)
+        tt.goto(ox, oy)
+
+        if fill:
+            tt.end_fill()
+
+    def pil_draw(self, img_draw: ImageDraw, image_centre_xy, fill=None, outline=(255, 255, 255), width=1):
+        if image_centre_xy:
+            image_coord_points = [super().to_image_coords(xy, image_centre_xy) for xy in self._points]
+        else:
+            image_coord_points = self._points[:]
+        img_draw.polygon(image_coord_points, fill=fill, outline=outline, width=width)
+
+    def svg_draw(self, element_id, image_centre_xy, fill, stroke):
+        image_coord_points = [super().to_image_coords(xy, image_centre_xy) for xy in self._points]
+        image_coord_points_str = ' '.join([','.join([str(v) for v in pt]) for pt in image_coord_points])
+        return f'''<polygon id="{element_id}" points="{image_coord_points_str}" fill="{fill}" stroke="{stroke}"/>'''
+
+    def get_2D_points(self):
+        return tuple(self._points[:])
+
+
+class ConvexPolygon(Polygon, Triangulate3D):
+
+    def get_2D_triangles(self):
+        print(f'{self.__class__}.get_2D_triangles()')
+        points_2d = self.get_2D_points()
+
+        # Remove repeats
+        points_2d = [pt for i, pt in enumerate(points_2d) if ((i==0) or (pt != points_2d[i-1]))]
+
+        # Remove last if first == last
+        if points_2d[0] == points_2d[-1]:
+            points_2d = points_2d[:-1]
+
+        length = len(points_2d)
+        if length < 3:
+            return []
+        if length == 3:
+            return points_2d[:]
+
+        cur = 0
+        cur_pt = points_2d[cur]
+        right_pt = points_2d[cur+1]
+        left_pt = points_2d[length-1-cur]
+        prev_left_pt = None
+
+        triangles_2d = []
+        while cur < length-cur-1:
+            if cur_pt != right_pt and right_pt != left_pt and left_pt != cur_pt:
+                triangles_2d.append([cur_pt, right_pt, left_pt])
+            if prev_left_pt:
+                if prev_left_pt != cur_pt and cur_pt != left_pt and left_pt != prev_left_pt:
+                    triangles_2d.append([prev_left_pt, cur_pt, left_pt])
+            prev_left_pt = left_pt
+            cur_pt = right_pt
+            cur += 1
+            right_pt = points_2d[cur+1]
+            left_pt = points_2d[length-1-cur]
+
+        return triangles_2d
+
+
+class Circle(ConvexPolygon):
     def __init__(self, centre_xy, radius):
         cx, cy = centre_xy
         self._centre_xy = cx, cy
@@ -387,51 +489,6 @@ class Circle(Shape, CenteredShape):
         return circle_points_48
 
 
-
-class Polygon(Shape, CanDo3D):
-    def __init__(self, points):
-        self._points = [(x, y) for x, y in points]
-
-    def __len__(self):
-        return len(self._points)
-
-    def __getitem__(self, idx):
-        return self._points[idx]    
-
-    def turtle_draw(self, tt: Turtle, fill=None, outline=None):
-        if not tt:
-            return
-        ox, oy = self._points[0]
-        tt.teleport(ox, oy)
-        if outline:
-            tt.pencolor(outline)
-        if fill:
-            tt.fillcolor(fill)
-            tt.begin_fill()
-        
-        for x, y in self._points[1:]:
-            tt.goto(x, y)
-        tt.goto(ox, oy)
-        
-        if fill:
-            tt.end_fill()
-
-    def pil_draw(self, img_draw: ImageDraw, image_centre_xy, fill=None, outline=(255, 255, 255), width=1):
-        if image_centre_xy:
-            image_coord_points = [super().to_image_coords(xy, image_centre_xy) for xy in self._points] 
-        else:
-            image_coord_points = self._points[:]
-        img_draw.polygon(image_coord_points, fill = fill, outline = outline, width=width)
-
-    def svg_draw(self, element_id, image_centre_xy, fill, stroke):
-        image_coord_points = [super().to_image_coords(xy, image_centre_xy) for xy in self._points] 
-        image_coord_points_str = ' '.join([','.join([str(v) for v in pt]) for pt in image_coord_points])
-        return f'''<polygon id="{element_id}" points="{image_coord_points_str}" fill="{fill}" stroke="{stroke}"/>'''
-
-    def get_2D_points(self):
-        return tuple(self._points[:])
-
-
 def get_point_angle(point, center_xy=(0, 0)):
     cx, cy = center_xy
     px, py = point
@@ -468,7 +525,6 @@ class CenteredPolygon(Polygon, CenteredShape):
         points = sort_points_by_direction(
             [(float(x), float(y)) for x, y in points], center_xy=self._centre_xy)
         super().__init__(points)
-
 
 class BezierCurve(Shape):
     DEFAULT_RESOLUTION = 10
@@ -537,4 +593,56 @@ class BezierCurve(Shape):
         guide_points_str = ', '.join([' '.join(xy) for xy in guide_points[1:]])
         svg_bezier_path_str = f'''<path id="{element_id}" d="M {start_x} {start_y} C {guide_points_str}" fill="{fill}" stroke="{stroke}"/>'''
         return svg_bezier_path_str
+
+    def get_2D_points(self):
+        return self.curve_points()
+
+
+def main():
+    one_by_rt_2 = 1/(2**.5)
+    cp = ConvexPolygon(
+        (
+            (1,0),
+            (one_by_rt_2, one_by_rt_2),
+            (0,1),
+            (-one_by_rt_2, one_by_rt_2),
+            (-1,0),
+            (-one_by_rt_2, -one_by_rt_2),
+            (0,-1),
+            (one_by_rt_2, -one_by_rt_2),
+        )
+    )
+    trangles = cp.get_2D_triangles()
+    print(len(trangles))
+    print(trangles)
+
+    cp = ConvexPolygon(
+        (
+            (one_by_rt_2, one_by_rt_2),
+            (0,1),
+            (-one_by_rt_2, one_by_rt_2),
+            (-one_by_rt_2, -one_by_rt_2),
+            (0,-1),
+            (one_by_rt_2, -one_by_rt_2),
+        )
+    )
+    trangles = cp.get_2D_triangles()
+    print(len(trangles))
+    print(trangles)
+
+    cp = ConvexPolygon(
+        (
+            (one_by_rt_2, one_by_rt_2),
+            (0,1),
+            (-one_by_rt_2, one_by_rt_2),
+            (0,-1),
+            (one_by_rt_2, -one_by_rt_2),
+        )
+    )
+    trangles = cp.get_2D_triangles()
+    print(len(trangles))
+    print(trangles)
+
+if __name__ == '__main__':
+    main()
 

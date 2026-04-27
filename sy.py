@@ -16,12 +16,13 @@ from turtle_capture import TurtleCapture
 (OUTPUT_DIR := pathlib.Path('output')).mkdir(exist_ok=True)
 
 
-class Dalam(Shape, CenteredShape):
+class Dalam(Polygon, Triangulate3D):
     def __init__(self, n, base_radius, tip_radius,centre_xy=(0, 0)):
         self._n = n
         self._base_radius = base_radius
         self._tip_radius = tip_radius
         self._centre_xy = centre_xy
+        super().__init__(self.curve_points())
 
     def _make_dalam_guide_points(self):
         cx, cy = self._centre_xy
@@ -93,15 +94,6 @@ class Dalam(Shape, CenteredShape):
             dalam_curve_points += bz.curve_points()
         return dalam_curve_points
 
-    def turtle_draw(self, tt: Turtle, fill=None, outline=None):
-        if not tt:
-            return
-        Polygon(self.curve_points()).turtle_draw(tt, fill=fill, outline=outline)
-    
-    def pil_draw(self, img_draw: ImageDraw, image_centre_xy, fill=None, outline=(255, 255, 255), width=1):
-        c_pts = self.curve_points(image_centre_xy)
-        Polygon(c_pts).pil_draw(img_draw, None, fill=fill, outline=outline, width=width)
-    
     def svg_draw(self, element_id, image_centre_xy, fill, stroke):
         bzs = self.make_dalam_beziers(image_centre_xy)
         path_instructions = []
@@ -126,10 +118,24 @@ class Dalam(Shape, CenteredShape):
     def get_2D_points(self):
         return tuple(self.curve_points())
 
+    def get_2D_triangles(self):
+        dalam_tips, dalam_intp1, dalam_intp2, dalam_bases = self._make_dalam_guide_points()
+
+        base_2D_triangles = ConvexPolygon(dalam_bases).get_2D_triangles()
+        dalam_beziers = self.make_dalam_beziers()
+
+        dalam_2D_triangles = []
+        for i, pt in enumerate(dalam_intp1):
+            dalam_points = dalam_beziers[2*i].curve_points() + dalam_beziers[2*i+1].curve_points()
+            dalam_2D_triangles.extend(CenteredPolygon(dalam_points, pt).get_2D_triangles())
+
+        return base_2D_triangles + dalam_2D_triangles
+
+
 SIN_COS_45 = 1/(2**.5)
 
 
-class BhupuraBoundaryPolygon(Polygon, CanDo3D):
+class BhupuraBoundaryPolygon(Polygon, Triangulate3D):
 
     def __init__(self, containing_circle_radius, boundary_level=0):
         radius = float(containing_circle_radius)
@@ -192,8 +198,8 @@ class BhupuraBoundaryPolygon(Polygon, CanDo3D):
 
         super().__init__(points)
 
-    def get_3D_triangles(self, bottom_y, level_height, point_3d_store, xyz_handedness='RIGHT'):
-        func_2d_to_3d = point_xy_2d_to_point_xz_3d[xyz_handedness]
+    def get_2D_triangles(self):
+        print(f'{self.__class__}.get_2D_triangles()')
         points_all = self.get_2D_points()
         triangles_2D = []
 
@@ -229,35 +235,41 @@ class BhupuraBoundaryPolygon(Polygon, CanDo3D):
             big_inner_rect[2:4] + big_inner_rect[:1]
         ]
 
-        top_y = bottom_y + level_height
-        triangles_3D = []
-        for t2d in triangles_2D:
-            bottom_t3d = [func_2d_to_3d(pt2d, bottom_y) for pt2d in reversed(t2d)]
-            triangles_3D.append(bottom_t3d)
+        return triangles_2D
 
-            top_t3d = [func_2d_to_3d(pt2d, top_y) for pt2d in t2d]
-            triangles_3D.append(top_t3d)
 
-        # Side triangles
-        top_points_3d = [func_2d_to_3d(pt2d, top_y) for pt2d in points_all]
-        bottom_points_3d = [func_2d_to_3d(pt2d, bottom_y) for pt2d in points_all]
+class StarryPolygon(Polygon, Triangulate3D):
+    def __init__(self, points, outward_vertex_parity=0):
+        points = sort_points_by_direction(points, (0, 0))
+        super().__init__(points)
+        self._outward_vertex_parity = outward_vertex_parity%2
 
-        sz = len(bottom_points_3d)
-        for i, bottom_pt in enumerate(bottom_points_3d):
-            top_pt = top_points_3d[i]
-            next_bottom_pt = bottom_points_3d[(i+1)%sz]
-            next_top_pt = top_points_3d[(i+1)%sz]
-            upper_triangle = [bottom_pt, next_top_pt, top_pt]
-            lower_triangle = [bottom_pt, next_bottom_pt, next_top_pt]
-            triangles_3D.append(upper_triangle)
-            triangles_3D.append(lower_triangle)
+    def get_2D_triangles(self):
+        points = self.get_2D_points()
 
-        triangle_3d_indexed = [
-            [get_or_add_3d_point_store_index(pt, point_3d_store) for pt in tri3d]
-            for tri3d in triangles_3D
-        ]
+        # Remove consecutuve duplicates
+        points = [pt for i, pt in enumerate(points) if ((i==0) or pt != points[i-1])]
 
-        return triangle_3d_indexed
+        # If first == last, remove last
+        if points[0] == points[-1]:
+            points = points[:-1]
+
+        num_points = len(points)
+        if num_points < 3:
+            return
+        if num_points == 3:
+            return [points[:]]
+
+        triangles_2d = []
+        for i, pt in enumerate(points):
+            if i%2 == self._outward_vertex_parity:
+                continue
+            next_pt = points[(i+1)%num_points]
+            next_next_pt = points[(i+2)%num_points]
+            triangles_2d.append([pt, next_pt, next_next_pt])
+
+        # print("StarryPolygon.Triangles_2D:", triangles_2d)
+        return triangles_2d
 
 
 def sy_bhupura_shapes(radius, turtle, show_turtle=True, show_intermediate_steps=True):
@@ -959,7 +971,13 @@ def build_sy_shapes(outer_radius, show_turtle=False, show_turtle_intermediate_st
     for level_name, level_point_indices in sy_level_points.items():
         _sort_point_indices_by_direction(level_point_indices)
         if level_name != 'level_0':
-            p = CenteredPolygon([sy_all_points[lpidx] for lpidx in level_point_indices])
+            level_num = int(level_name[len('level_'):])
+            if level_num % 2 == 1:
+                out_vertext_parity = 0 if level_num == 7 else 1
+                p = StarryPolygon([sy_all_points[lpidx] for lpidx in level_point_indices],
+                                  outward_vertex_parity=out_vertext_parity)
+            else:
+                p = ConvexPolygon([sy_all_points[lpidx] for lpidx in level_point_indices])
             final_level_wise_polygons.append(p)
     
     final_level_wise_polygons = tuple(final_level_wise_polygons)
@@ -1228,7 +1246,7 @@ def main():
 
     gltf_file_path = OUTPUT_DIR / f'sy-3D-triangles-{radius}.gltf'
     gltf = make_gltf(triangle_point_store, triangle_faces, scale_down_factor=1000)
-    print(gltf)
+    # print(gltf)
     save_gltf_to_file(gltf, gltf_file_path)
 
 
